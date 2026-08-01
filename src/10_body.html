@@ -1,0 +1,116 @@
+<div class="app">
+
+  <!-- ============================ INSTRUMENT COLUMN ============================ -->
+  <aside class="instrument">
+    <div class="ident">
+      <h1>Earth <span class="x">&times;</span> Time</h1>
+      <p>Two clocks at right angles. Along the bottom, when things happened.
+         Up the right-hand edge, when we worked them out.</p>
+    </div>
+
+    <div class="controls">
+      <div class="group">
+        <span class="lbl" id="lbl-res">When claims disagree</span>
+        <div class="seg" role="group" aria-labelledby="lbl-res" id="resolver">
+          <button data-mode="consensus" aria-pressed="true">Best supported</button>
+          <button data-mode="frontier"  aria-pressed="false">Newest</button>
+          <button data-mode="spread"    aria-pressed="false">Show all</button>
+        </div>
+        <p class="resolver-note" id="resnote"></p>
+      </div>
+
+      <div class="group">
+        <span class="lbl" id="lbl-sub">Fields of study <span style="text-transform:none;letter-spacing:0">— click to hide, double-click to isolate</span></span>
+        <div class="subs" role="group" aria-labelledby="lbl-sub" id="subjects"></div>
+        <p class="subs-hint" id="subhint"></p>
+      </div>
+    </div>
+
+    <div class="detail" id="detail" tabindex="-1" aria-live="polite"></div>
+  </aside>
+
+  <!-- ================================= STAGE ================================== -->
+  <main class="stage" id="stage">
+    <canvas id="globe" tabindex="0" role="img"
+            aria-label="Orthographic globe showing dated claims about Earth history. Use arrow keys to rotate, plus and minus to zoom."></canvas>
+
+    <div class="stage-tl">
+      <div class="as-of">As understood in <b id="asof-year">2025</b></div>
+      <p class="epistemic" id="epistemic"></p>
+    </div>
+
+    <div class="stage-tr">
+      <button class="iconbtn" id="btn-tour">Guided path</button>
+      <button class="iconbtn" id="btn-diff" aria-pressed="false">Compare eras</button>
+      <button class="iconbtn" id="btn-plates" aria-pressed="true">Plates</button>
+      <button class="iconbtn" id="btn-theme">Theme</button>
+    </div>
+
+    <div class="stage-bl">
+      <div class="legend">
+        <div><span class="g" id="lg-solid"></span> settled — one agreed date</div>
+        <div><span class="g" id="lg-band"></span> disputed — the width is the disagreement</div>
+        <div><span class="g" id="lg-arc"></span> cause, animated toward the effect</div>
+      </div>
+    </div>
+
+    <div class="tip" id="tip" role="status"></div>
+  </main>
+
+  <!-- =========================== KNOWLEDGE-TIME RAIL =========================== -->
+  <aside class="krail">
+    <div class="krail-head">
+      <span class="lbl">As understood in</span>
+      <div class="krail-year num" id="krail-year">2025</div>
+    </div>
+    <canvas id="krailcv" tabindex="0" role="slider"
+            aria-label="Knowledge time: the year you are reading the record from"
+            aria-valuemin="1650" aria-valuemax="2025" aria-valuenow="2025"></canvas>
+    <div class="krail-foot">
+      <button class="iconbtn" id="btn-play" aria-pressed="false">Replay</button>
+      <button class="iconbtn" id="btn-now">2025</button>
+    </div>
+  </aside>
+
+  <!-- ============================ EARTH-TIME AXIS ============================= -->
+  <section class="chron">
+    <div class="chron-bar">
+      <span class="rd">Showing <b id="rd-window">all 4.54 billion years</b></span>
+      <span class="rd" id="rd-cursor"></span>
+      <span class="spacer"></span>
+      <span class="presets" id="presets">
+        <button data-t0="0" data-t1="4600000000">All</button>
+        <button data-t0="0" data-t1="541000000">Phanerozoic</button>
+        <button data-t0="0" data-t1="252000000">Since the Great Dying</button>
+        <button data-t0="0" data-t1="70000000">Since the dinosaurs</button>
+        <button data-t0="0" data-t1="60000">Us</button>
+      </span>
+    </div>
+    <canvas id="chroncv" tabindex="0" role="slider"
+            aria-label="Earth time axis. Drag to pan, scroll to zoom, arrow keys to move the cursor."
+            aria-valuemin="0" aria-valuemax="4600000000" aria-valuenow="0"></canvas>
+  </section>
+
+</div>
+
+<div class="diffwrap" id="diffwrap" hidden>
+  <div class="diff" role="dialog" aria-modal="true" aria-labelledby="diff-title">
+    <div class="diff-head">
+      <h2 id="diff-title">What changed</h2>
+      <span class="yr">between <input type="number" id="diff-a" min="1650" max="2025" step="1" value="1975" /></span>
+      <span class="yr">and <input type="number" id="diff-b" min="1650" max="2025" step="1" value="2025" /></span>
+      <span class="spacer" style="flex:1"></span>
+      <button class="iconbtn" id="diff-close">Close</button>
+    </div>
+    <div class="diff-body" id="diff-body"></div>
+  </div>
+</div>
+
+<div class="tourbar" id="tourbar" hidden>
+  <span class="n" id="tour-n">1 / 6</span>
+  <span class="step" id="tour-step"></span>
+  <span style="flex:1"></span>
+  <button class="iconbtn" id="tour-prev">Back</button>
+  <button class="iconbtn" id="tour-next">Next</button>
+  <button class="iconbtn" id="tour-exit">Exit</button>
+</div>

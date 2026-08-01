@@ -55,7 +55,9 @@ def collect(geom, out):
             out.append([tuple(p[:2]) for p in ring])
 
 def encode_signed(n, buf):
-    v = (~n << 1) if n < 0 else (n << 1)
+    # Zigzag: ~(n << 1) for negatives, NOT (~n) << 1. The latter maps -5 to +4,
+    # so every westward/southward step reverses and the ring walks off the globe.
+    v = ~(n << 1) if n < 0 else (n << 1)
     while v >= 0x20:
         buf.append(ALPHA[(0x20 | (v & 0x1f))])
         v >>= 5

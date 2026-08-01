@@ -1,0 +1,225 @@
+{
+  "_comment": "Hand-authored. The generated clusters start at knowledge-time 1830, which leaves the 1650-1830 stretch of the knowledge rail empty. These are the claims that made deep time thinkable at all, plus the superseded ages of the Earth. Scrubbing knowledge-time to 1880 should collapse the planet to ~100 Myr old: that is the whole thesis in one drag. Every citation here is a canonical work chosen because its existence is not in doubt.",
+  "referents": [],
+  "claims": [
+    {
+      "id": "clm_steno_superposition",
+      "about": "earth_formation",
+      "statement": "Rock layers were laid down in sequence, the lowest first, so strata record an order of events.",
+      "type": "interpretation",
+      "earth_time_start": 4540000000,
+      "earth_time_end": 0,
+      "time_precision": 0,
+      "geometry": { "mode": "point", "lat": 43.78, "lng": 11.25, "radius_km": null },
+      "coords_are_modern": true,
+      "subjects": ["geology", "human_history"],
+      "zoom_band": [0, 10],
+      "significance": 4,
+      "asserted_by": "Steno 1669, De solido intra solidum naturaliter contento prodromus",
+      "knowledge_time": 1669,
+      "status_timeline": [
+        { "knowledge_time": 1669, "status": "proposed", "source": "Steno 1669, Florence — superposition, original horizontality and lateral continuity, from dissecting Tuscan hillsides" },
+        { "knowledge_time": 1800, "status": "consensus", "source": "stratigraphic practice, c. 1800 — superposition becomes the working assumption of field geology" }
+      ]
+    },
+    {
+      "id": "clm_hutton_deep_time",
+      "about": "earth_formation",
+      "statement": "The rock cycle has run so long that the record shows no vestige of a beginning and no prospect of an end.",
+      "type": "interpretation",
+      "earth_time_start": 4540000000,
+      "earth_time_end": 0,
+      "time_precision": 0,
+      "geometry": { "mode": "point", "lat": 55.93, "lng": -2.3, "radius_km": null },
+      "coords_are_modern": true,
+      "subjects": ["geology", "human_history"],
+      "zoom_band": [0, 10],
+      "significance": 5,
+      "asserted_by": "Hutton 1788, Transactions of the Royal Society of Edinburgh",
+      "knowledge_time": 1788,
+      "status_timeline": [
+        { "knowledge_time": 1788, "status": "proposed", "source": "Hutton 1788 — the angular unconformity at Siccar Point read as two complete cycles of deposition, uplift and erosion" },
+        { "knowledge_time": 1800, "status": "contested", "source": "scriptural geology, c. 1800 — an indefinitely old Earth is resisted on theological grounds" },
+        { "knowledge_time": 1840, "status": "consensus", "source": "geological consensus, c. 1840 — an Earth vastly older than human record is taken as established" }
+      ]
+    },
+    {
+      "id": "clm_lyell_uniformity",
+      "about": "clm_hutton_deep_time",
+      "statement": "Present-day rates of erosion and deposition are enough to explain the past; no former catastrophes need be invoked.",
+      "type": "interpretation",
+      "earth_time_start": 4540000000,
+      "earth_time_end": 0,
+      "time_precision": 0,
+      "geometry": { "mode": "global", "lat": null, "lng": null, "radius_km": null },
+      "coords_are_modern": true,
+      "subjects": ["geology", "human_history"],
+      "zoom_band": [0, 10],
+      "significance": 4,
+      "asserted_by": "Lyell 1830-1833, Principles of Geology (John Murray)",
+      "knowledge_time": 1830,
+      "status_timeline": [
+        { "knowledge_time": 1830, "status": "proposed", "source": "Lyell 1830-1833 — Hutton's deep time restated as strict uniformity of rate as well as of process" },
+        { "knowledge_time": 1860, "status": "consensus", "source": "geological consensus, c. 1860 — uniformitarianism becomes the disciplinary default" },
+        { "knowledge_time": 1980, "status": "contested", "source": "Alvarez et al. 1980, Science — a sudden extraterrestrial catastrophe reopens the question of rate" }
+      ]
+    },
+    {
+      "id": "clm_kelvin_cooling_age",
+      "about": "earth_formation",
+      "statement": "The Earth's heat loss limits its age to somewhere between twenty and four hundred million years, most likely about a hundred.",
+      "type": "dating",
+      "earth_time_start": 98000000,
+      "earth_time_end": 98000000,
+      "time_precision": 90000000,
+      "geometry": { "mode": "global", "lat": null, "lng": null, "radius_km": null },
+      "coords_are_modern": true,
+      "subjects": ["geology", "astronomy", "chemistry"],
+      "zoom_band": [0, 10],
+      "significance": 5,
+      "asserted_by": "Thomson (Kelvin) 1862, Transactions of the Royal Society of Edinburgh",
+      "knowledge_time": 1862,
+      "status_timeline": [
+        { "knowledge_time": 1862, "status": "proposed", "source": "Thomson 1862, On the Secular Cooling of the Earth — a cooling sphere with no internal heat source" },
+        { "knowledge_time": 1870, "status": "consensus", "source": "physical consensus, 1870s-1890s — Kelvin's authority compresses the geological timescale against the objections of geologists and of Darwin" },
+        { "knowledge_time": 1903, "status": "contested", "source": "Curie & Laborde 1903, Comptes Rendus — radium generates heat, so the Earth is not a simply cooling body" },
+        { "knowledge_time": 1913, "status": "superseded", "source": "Holmes 1913, The Age of the Earth — radiometric ages exceed Kelvin's ceiling outright" }
+      ]
+    },
+    {
+      "id": "clm_boltwood_radiometric",
+      "about": "earth_formation",
+      "statement": "Lead accumulating in uranium minerals gives rock ages from four hundred million up to two thousand million years.",
+      "type": "dating",
+      "earth_time_start": 2200000000,
+      "earth_time_end": 2200000000,
+      "time_precision": 900000000,
+      "geometry": { "mode": "global", "lat": null, "lng": null, "radius_km": null },
+      "coords_are_modern": true,
+      "subjects": ["geology", "chemistry"],
+      "zoom_band": [1, 10],
+      "significance": 4,
+      "asserted_by": "Boltwood 1907, American Journal of Science",
+      "knowledge_time": 1907,
+      "status_timeline": [
+        { "knowledge_time": 1907, "status": "proposed", "source": "Boltwood 1907 — the first uranium-lead ages, on ten mineral samples" },
+        { "knowledge_time": 1927, "status": "contested", "source": "age-of-the-Earth debate, 1920s — radiometric ages accepted in principle, the numbers still moving" },
+        { "knowledge_time": 1956, "status": "superseded", "source": "Patterson 1956 — the meteoritic lead isochron settles the figure near 4.55 Ga" }
+      ]
+    },
+    {
+      "id": "clm_holmes_age",
+      "about": "earth_formation",
+      "statement": "Radioactive decay makes the Earth at least sixteen hundred million years old, far beyond any cooling estimate.",
+      "type": "dating",
+      "earth_time_start": 1600000000,
+      "earth_time_end": 1600000000,
+      "time_precision": 400000000,
+      "geometry": { "mode": "global", "lat": null, "lng": null, "radius_km": null },
+      "coords_are_modern": true,
+      "subjects": ["geology", "chemistry"],
+      "zoom_band": [1, 10],
+      "significance": 4,
+      "asserted_by": "Holmes 1913, The Age of the Earth (Harper & Brothers)",
+      "knowledge_time": 1913,
+      "status_timeline": [
+        { "knowledge_time": 1913, "status": "proposed", "source": "Holmes 1913 — the first sustained argument for a radiometric geological timescale" },
+        { "knowledge_time": 1931, "status": "consensus", "source": "National Research Council report on the age of the Earth, 1931 — radiometric dating formally endorsed" },
+        { "knowledge_time": 1956, "status": "superseded", "source": "Patterson 1956 — superseded by the meteoritic lead isochron" }
+      ]
+    },
+    {
+      "id": "clm_wegener_drift",
+      "about": "carboniferous_forests",
+      "statement": "Matching Carboniferous floras and glacial beds on now-separate continents mean the landmasses were once joined.",
+      "type": "interpretation",
+      "earth_time_start": 320000000,
+      "earth_time_end": 250000000,
+      "time_precision": 20000000,
+      "geometry": { "mode": "global", "lat": null, "lng": null, "radius_km": null },
+      "coords_are_modern": true,
+      "subjects": ["geology", "biology"],
+      "zoom_band": [1, 10],
+      "significance": 5,
+      "asserted_by": "Wegener 1915, Die Entstehung der Kontinente und Ozeane",
+      "knowledge_time": 1915,
+      "status_timeline": [
+        { "knowledge_time": 1915, "status": "proposed", "source": "Wegener 1915 — Pangaea argued from the fit of coastlines and the distribution of the Glossopteris flora" },
+        { "knowledge_time": 1928, "status": "contested", "source": "American Association of Petroleum Geologists symposium, 1926-1928 — drift rejected, largely for lacking a mechanism" },
+        { "knowledge_time": 1963, "status": "contested", "source": "Vine & Matthews 1963, Nature — magnetic striping on the seafloor supplies the missing mechanism" },
+        { "knowledge_time": 1968, "status": "consensus", "source": "Morgan 1968 and Le Pichon 1968 — plate tectonics becomes the framework of the earth sciences" }
+      ]
+    },
+    {
+      "id": "clm_kpg_65ma_textbook",
+      "about": "kpg_extinction",
+      "statement": "The Cretaceous-Tertiary boundary sits at sixty-five million years, the round figure carried by textbooks for decades.",
+      "type": "dating",
+      "earth_time_start": 65000000,
+      "earth_time_end": 65000000,
+      "time_precision": 1000000,
+      "geometry": { "mode": "global", "lat": null, "lng": null, "radius_km": null },
+      "coords_are_modern": true,
+      "subjects": ["geology", "biology"],
+      "zoom_band": [0, 10],
+      "significance": 3,
+      "asserted_by": "Cretaceous-Tertiary boundary age, textbook consensus c. 1980-2005 (no single originating paper)",
+      "knowledge_time": 1980,
+      "status_timeline": [
+        { "knowledge_time": 1980, "status": "consensus", "source": "timescale consensus, 1980s-1990s — deliberately vague attribution; 65 Ma was a rounded figure in general circulation, not one group's result" },
+        { "knowledge_time": 2013, "status": "superseded", "source": "Renne et al. 2013, Science — recalibration moves the boundary to 66.043 Ma and the round number retires" }
+      ]
+    },
+    {
+      "id": "clm_kpg_renne_2013",
+      "about": "kpg_extinction",
+      "statement": "Argon dating of boundary tektites and ash puts the extinction at 66.043 million years, to within eleven thousand.",
+      "type": "dating",
+      "earth_time_start": 66043000,
+      "earth_time_end": 66043000,
+      "time_precision": 11000,
+      "geometry": { "mode": "global", "lat": null, "lng": null, "radius_km": null },
+      "coords_are_modern": true,
+      "subjects": ["geology", "chemistry", "biology"],
+      "zoom_band": [0, 10],
+      "significance": 4,
+      "asserted_by": "Renne et al. 2013, Science",
+      "knowledge_time": 2013,
+      "status_timeline": [
+        { "knowledge_time": 2013, "status": "proposed", "source": "Renne et al. 2013, Science — Time Scales of Critical Events Around the Cretaceous-Paleogene Boundary" },
+        { "knowledge_time": 2016, "status": "consensus", "source": "geochronological consensus, mid-2010s — 66.0 Ma adopted by the international timescale" }
+      ]
+    },
+    {
+      "id": "clm_marinoan_635",
+      "about": "snowball_earth",
+      "statement": "The second great freeze, the Marinoan, ends at 635 million years, the boundary that now opens the Ediacaran.",
+      "type": "dating",
+      "earth_time_start": 650000000,
+      "earth_time_end": 635000000,
+      "time_precision": 5000000,
+      "geometry": { "mode": "global", "lat": null, "lng": null, "radius_km": null },
+      "coords_are_modern": true,
+      "subjects": ["geology", "chemistry"],
+      "zoom_band": [2, 10],
+      "significance": 4,
+      "asserted_by": "Condon et al. 2005, Science",
+      "knowledge_time": 2005,
+      "status_timeline": [
+        { "knowledge_time": 2005, "status": "proposed", "source": "Condon et al. 2005, Science — U-Pb ages from the Doushantuo Formation, South China" },
+        { "knowledge_time": 2012, "status": "consensus", "source": "chronostratigraphic consensus — 635 Ma ratified as the base of the Ediacaran, at the top of the Marinoan cap carbonate" }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "edg_kelvin_constrains_earth",
+      "source": "earth_formation",
+      "target": "carboniferous_forests",
+      "type": "part_of",
+      "label": "coal forests sit inside Earth history",
+      "asserted_by": "Steno 1669, De solido intra solidum naturaliter contento prodromus",
+      "claim_id": "clm_steno_superposition"
+    }
+  ]
+}
