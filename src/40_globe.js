@@ -451,11 +451,13 @@ function drawGlobe(dt) {
       gx.fillStyle = withAlpha(col, it.dimmed ? 0.03 : 0.055); gx.fill();
     }
 
-    drawMarker(sx, sy, it.res.significance, col, st, {
-      selected: it.id === S.selection,
-      dimmed: it.dimmed,
-      disputed: it.res.disputed
-    });
+    // A node pulled back only to carry an edge is a supporting player.
+    drawMarker(sx, sy, it.viaEdge ? Math.min(it.res.significance, 2) : it.res.significance,
+      col, st, {
+        selected: it.id === S.selection,
+        dimmed: it.dimmed,
+        disputed: it.res.disputed
+      });
 
     if (it.rolledUp) {
       gx.font = `600 9px ${'xt-mono'}, monospace`;
@@ -466,7 +468,7 @@ function drawGlobe(dt) {
     HIT.push({ id: it.id, x: sx, y: sy, r: markerRadius(it.res.significance) + 7 });
 
     const strong = it.id === S.selection || it.id === S.hover;
-    if (!it.dimmed && (strong || it.res.significance >= 4))
+    if (!it.dimmed && (strong || (it.res.significance >= 4 && !it.viaEdge)))
       drawLabel(sx, sy, it.ref.label, col, boxes, strong);
   }
 

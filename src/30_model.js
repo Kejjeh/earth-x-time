@@ -174,6 +174,27 @@ function queryFacts(A) {
     it.visible = it.inWindow && it.subjectOn && it.zoomOK && !it.aggregatedInto;
   }
 
+  /* An edge is information, and culling a node by zoom silently deletes every
+     edge that reaches it. That quietly hid the best thing in the dataset: at
+     the default full-Earth view the Deccan Traps sit below the zoom band, so
+     the volcanism link that dies in 1991 never rendered at all. If a live edge
+     has one end on screen, bring the other end back — one hop only, marked so
+     it can be drawn as a supporting player rather than a peer. */
+  for (const e of GRAPH.edges) {
+    if (e.type !== 'causal') continue;
+    const claim = R.claims[e.claim_id];
+    if (!claim || statusAt(claim, A.kt) === null) continue;
+    const a = items[e.source], b = items[e.target];
+    if (!a || !b) continue;
+    for (const [seen, hidden] of [[a, b], [b, a]]) {
+      if (seen.visible && !seen.viaEdge && !hidden.visible &&
+          hidden.inWindow && hidden.subjectOn && !hidden.aggregatedInto) {
+        hidden.visible = true;
+        hidden.viaEdge = true;
+      }
+    }
+  }
+
   /* Edges. An edge inherits the status timeline of the claim that asserts it,
      so it appears when that claim was first made and greys out when superseded. */
   const edges = [];

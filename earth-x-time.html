@@ -444,8 +444,11 @@ button { background: none; border: none; cursor: pointer; padding: 0; }
 
   <!-- ================================= STAGE ================================== -->
   <main class="stage" id="stage">
-    <canvas id="globe" tabindex="0" role="img"
-            aria-label="Orthographic globe showing dated claims about Earth history. Use arrow keys to rotate, plus and minus to zoom."></canvas>
+    <!-- application, not img: arrow keys must reach the canvas to rotate it,
+         and a screen reader should not swallow them. Selections are announced
+         through the detail panel, which is the aria-live region. -->
+    <canvas id="globe" tabindex="0" role="application"
+            aria-label="Orthographic globe of dated claims about Earth history. Arrow keys rotate, plus and minus zoom, Escape clears the selection."></canvas>
 
     <div class="stage-tl">
       <div class="as-of">As understood in <b id="asof-year">2025</b></div>
@@ -958,6 +961,27 @@ function queryFacts(A) {
   for (const id of order) {
     const it = items[id];
     it.visible = it.inWindow && it.subjectOn && it.zoomOK && !it.aggregatedInto;
+  }
+
+  /* An edge is information, and culling a node by zoom silently deletes every
+     edge that reaches it. That quietly hid the best thing in the dataset: at
+     the default full-Earth view the Deccan Traps sit below the zoom band, so
+     the volcanism link that dies in 1991 never rendered at all. If a live edge
+     has one end on screen, bring the other end back — one hop only, marked so
+     it can be drawn as a supporting player rather than a peer. */
+  for (const e of GRAPH.edges) {
+    if (e.type !== 'causal') continue;
+    const claim = R.claims[e.claim_id];
+    if (!claim || statusAt(claim, A.kt) === null) continue;
+    const a = items[e.source], b = items[e.target];
+    if (!a || !b) continue;
+    for (const [seen, hidden] of [[a, b], [b, a]]) {
+      if (seen.visible && !seen.viaEdge && !hidden.visible &&
+          hidden.inWindow && hidden.subjectOn && !hidden.aggregatedInto) {
+        hidden.visible = true;
+        hidden.viaEdge = true;
+      }
+    }
   }
 
   /* Edges. An edge inherits the status timeline of the claim that asserts it,
@@ -1493,11 +1517,13 @@ function drawGlobe(dt) {
       gx.fillStyle = withAlpha(col, it.dimmed ? 0.03 : 0.055); gx.fill();
     }
 
-    drawMarker(sx, sy, it.res.significance, col, st, {
-      selected: it.id === S.selection,
-      dimmed: it.dimmed,
-      disputed: it.res.disputed
-    });
+    // A node pulled back only to carry an edge is a supporting player.
+    drawMarker(sx, sy, it.viaEdge ? Math.min(it.res.significance, 2) : it.res.significance,
+      col, st, {
+        selected: it.id === S.selection,
+        dimmed: it.dimmed,
+        disputed: it.res.disputed
+      });
 
     if (it.rolledUp) {
       gx.font = `600 9px ${'xt-mono'}, monospace`;
@@ -1508,7 +1534,7 @@ function drawGlobe(dt) {
     HIT.push({ id: it.id, x: sx, y: sy, r: markerRadius(it.res.significance) + 7 });
 
     const strong = it.id === S.selection || it.id === S.hover;
-    if (!it.dimmed && (strong || it.res.significance >= 4))
+    if (!it.dimmed && (strong || (it.res.significance >= 4 && !it.viaEdge)))
       drawLabel(sx, sy, it.ref.label, col, boxes, strong);
   }
 

@@ -31,8 +31,11 @@
 
   <!-- ================================= STAGE ================================== -->
   <main class="stage" id="stage">
-    <canvas id="globe" tabindex="0" role="img"
-            aria-label="Orthographic globe showing dated claims about Earth history. Use arrow keys to rotate, plus and minus to zoom."></canvas>
+    <!-- application, not img: arrow keys must reach the canvas to rotate it,
+         and a screen reader should not swallow them. Selections are announced
+         through the detail panel, which is the aria-live region. -->
+    <canvas id="globe" tabindex="0" role="application"
+            aria-label="Orthographic globe of dated claims about Earth history. Arrow keys rotate, plus and minus zoom, Escape clears the selection."></canvas>
 
     <div class="stage-tl">
       <div class="as-of">As understood in <b id="asof-year">2025</b></div>
