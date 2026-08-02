@@ -74,6 +74,63 @@ def resolve(claims_for_ref, kt, mode):
     return live[0][0]
 
 
+ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-"
+_AMAP = {c: i for i, c in enumerate(ALPHA)}
+
+
+def load_land():
+    """Decode the shipped coastline into lon/lat rings."""
+    path = os.path.join(ROOT, "assets", "coast.txt")
+    if not os.path.exists(path):
+        return []
+    enc = open(path, encoding="utf-8").read().split("===LAND===")[1].split("===PLATES===")[0].strip()
+    rings = []
+    for part in filter(None, enc.split("|")):
+        i = px = py = 0
+        ring = []
+        while i < len(part):
+            vals = []
+            for _ in range(2):
+                shift = res = 0
+                while True:
+                    b = _AMAP[part[i]]; i += 1
+                    res |= (b & 0x1f) << shift; shift += 5
+                    if b < 0x20:
+                        break
+                vals.append(~(res >> 1) if (res & 1) else (res >> 1))
+            px += vals[0]; py += vals[1]
+            ring.append((px / 32, py / 32))
+        if len(ring) >= 3:
+            rings.append(ring)
+    return rings
+
+
+def on_land(lat, lng, rings):
+    """
+    Even-odd ray cast in lon/lat.
+
+    Distance to the nearest coastline is NOT the test — it is large both for a
+    point far out at sea and for one deep inland, so it flags Jack Hills and the
+    Burgess Shale exactly as loudly as it flags the mid-Atlantic. What matters is
+    whether the point is inside a landmass. Even-odd counting handles lakes for
+    free. Unreliable within a degree of the antimeridian and at the poles, so
+    callers should treat a bare "not on land" as a warning, not a verdict.
+    """
+    inside = False
+    for ring in rings:
+        n = len(ring)
+        for i in range(n):
+            x1, y1 = ring[i]
+            x2, y2 = ring[(i + 1) % n]
+            if abs(x2 - x1) > 180:          # antimeridian wrap: skip the seam edge
+                continue
+            if (y1 > lat) != (y2 > lat):
+                xin = x1 + (lat - y1) * (x2 - x1) / (y2 - y1)
+                if xin > lng:
+                    inside = not inside
+    return inside
+
+
 def main():
     src = sys.argv[1]
     obj = deep_clean(load(src))
@@ -91,11 +148,24 @@ def main():
     refs, claims, edges = g["referents"], g["claims"], g["edges"]
 
     # ---- uniqueness -------------------------------------------------------
+    # Clusters overlap at the seams — the Mesozoic and Cenozoic authors both
+    # declare kpg_extinction, by design, since edges must span them. Identical
+    # re-declarations merge; genuine conflicts are an error.
     rid = {}
+    deduped = []
     for r in refs:
-        if r["id"] in rid:
-            errors.append(f"duplicate referent id {r['id']}")
+        prev = rid.get(r["id"])
+        if prev:
+            if prev["label"] != r["label"] or prev["kind"] != r["kind"]:
+                errors.append(f"referent {r['id']} declared twice with different "
+                              f"label/kind: {prev} vs {r}")
+            else:
+                warns.append(f"referent {r['id']} declared by two clusters -> merged")
+            continue
         rid[r["id"]] = r
+        deduped.append(r)
+    refs = deduped
+    g["referents"] = refs
     cid = {}
     for c in claims:
         if c["id"] in cid:
@@ -187,6 +257,26 @@ def main():
             seen_edge.add(key)
             kept.append(e)
     g["edges"] = kept
+
+    # ---- coordinates must land near real geography ------------------------
+    # A fact-checker caught the Carboniferous coal forests at 45N -20E: 1,500 km
+    # into the open North Atlantic, and on a globe that is a visible bug. The
+    # coastline is 110m simplified at 0.42 degrees, so the coast can be tens of
+    # km off; and plenty of real sites are genuinely offshore (Chicxulub's
+    # centre, Thera's caldera). Only flag what no simplification explains.
+    land = load_land()
+    if land:
+        wet = []
+        for c in claims:
+            gm = c["geometry"]
+            if gm["mode"] != "point" or gm.get("lat") is None:
+                continue
+            if not on_land(gm["lat"], gm["lng"], land):
+                wet.append(f"{c['id']} ({c['about']}) at {gm['lat']:.2f},{gm['lng']:.2f}")
+        if wet:
+            warns.append(f"{len(wet)} point coordinate(s) fall in water — verify each is "
+                         f"genuinely offshore (a crater centre, a caldera, a drill site) "
+                         f"and not a typo: " + "; ".join(wet[:6]))
 
     # ---- the promised cross-domain chain ----------------------------------
     chain = ["chicxulub_impact", "kpg_extinction", "mammal_radiation",
