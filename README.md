@@ -36,6 +36,27 @@ from the competing dating-claims at the current knowledge-time, in one of three
 modes: best-supported, newest, or show-the-spread. It always returns the winner,
 the rivals, and the provenance — never a bare number.
 
+Three rules in there are worth knowing, because each one started as a bug:
+
+- **Only rival datings set the band.** A claim about the *kill mechanism* of an
+  extinction is not a rival dating of it. Letting every claim that carries a date
+  into the envelope inflated the K–Pg band to 12 Myr when its two actual dating
+  claims agree within one.
+- **Superseded claims stay visible but stop stretching the band.** They render as
+  hollow dashed markers. Otherwise Kelvin's defeated 98 Ma Earth drags the
+  formation of the planet forward into the Cenozoic. A consequence worth naming:
+  `disputed` is knowledge-time-dependent. The K–Pg date is disputed at 1970 and
+  settled at 2025, which is true.
+- **An edge keeps its far endpoint on screen.** Culling a node by `zoom_band`
+  silently deletes every edge that reaches it. At the default full-Earth view the
+  Deccan Traps sit below the band, so the volcanism link that dies in 1991 never
+  drew at all. A live edge with one end visible now pulls the other back, one hop,
+  drawn small and unlabelled.
+
+Position comes from the claim that *won the date*, including when it says
+"global" — otherwise attaching Hutton's 1788 claim to the formation of the Earth
+renders the planet's origin as a dot at Siccar Point.
+
 ## Building
 
 `src/` is concatenated in filename order and the bulky assets are injected:
