@@ -2710,11 +2710,23 @@ document.getElementById('tour-exit').addEventListener('click', tourExit);
 /* -------------------------------------------------------------- render loop */
 function ease(t) { return t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
 
+/*
+ * render(dt) does the work; frame(now) only schedules it.
+ *
+ * They were one function, and everything the page shows was drawn from inside
+ * the requestAnimationFrame callback. rAF does not fire in a document whose
+ * visibilityState is "hidden" — a background tab, an offscreen preview pane,
+ * some embeddings — so the entire UI simply never appeared, while every static
+ * thing boot() writes did. Splitting them lets a watchdog paint without rAF,
+ * and stops each manual paint from starting a second animation chain that all
+ * run at once when the page finally becomes visible.
+ */
 let last = performance.now();
-function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000);
-  last = now;
+let lastPaint = 0;
+let rafPending = false;
 
+function render(dt) {
+  lastPaint = performance.now();
   sizeGuard();
 
   if (TW) {
@@ -2761,8 +2773,34 @@ function frame(now) {
     if (!diffwrap.hidden) renderDiff();
     needPanel = false;
   }
+}
+
+function frame(now) {
+  rafPending = false;
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  try { render(dt); } catch (err) { console.error('render failed', err); }
+  rafPending = true;
   requestAnimationFrame(frame);
 }
+
+/** Paint immediately, outside the animation loop. */
+function renderNow() {
+  last = performance.now();
+  try { render(0.016); } catch (err) { console.error('render failed', err); }
+}
+
+/* If rAF has not painted recently and something is dirty, paint anyway. This is
+   what makes the page work at all where rAF is paused; animation stops, but the
+   globe, the ribbon and the panels are all there and still respond. */
+setInterval(() => {
+  if (performance.now() - lastPaint > 400 &&
+      (needGlobe || needChron || needKrail || needPanel)) renderNow();
+}, 250);
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) { markAll(); renderNow(); }
+});
 
 /* ------------------------------------------------------------------- start */
 function boot() {
@@ -2776,7 +2814,8 @@ function boot() {
     document.getElementById(id).style.cssText = css + ';height:9px';
   }
   changed();
-  requestAnimationFrame(frame);
+  renderNow();                    // paint once without waiting for rAF
+  requestAnimationFrame(frame);   // then run the animation loop if it is available
 }
 
 const ro = new ResizeObserver(() => {
