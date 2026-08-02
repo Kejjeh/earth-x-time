@@ -113,6 +113,11 @@
 }
 
 /* ============================================================ BASE */
+/* Must come before any class sets `display`. The UA rule for [hidden] is a bare
+   element-less selector, so `.diffwrap { display: flex }` outranks it and the
+   modal stays on screen covering the globe however many times JS sets .hidden. */
+[hidden] { display: none !important; }
+
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
 body {
@@ -1226,15 +1231,37 @@ const GRAT = (() => {
   return out;
 })();
 
+/*
+ * Size the backing store only — never write an inline width/height.
+ *
+ * The clamp below stops a zero measurement producing a zero-sized canvas, but
+ * written as an inline style it becomes permanent: a page laid out while hidden
+ * (a background tab, an artifact iframe before it is shown) measures 0, pins the
+ * element at the 80px minimum, and stays an 80px globe in an 800px stage
+ * forever after. CSS keeps the element at 100% of the stage; only the pixel
+ * buffer is set here, and sizeGuard re-syncs it once real layout arrives.
+ */
 function resizeGlobe() {
-  const r = gcv.parentElement.getBoundingClientRect();
+  const w = gcv.clientWidth || gcv.parentElement.getBoundingClientRect().width;
+  const h = gcv.clientHeight || gcv.parentElement.getBoundingClientRect().height;
   DPR = Math.min(window.devicePixelRatio || 1, 2);
-  GW = Math.max(80, r.width); GH = Math.max(80, r.height);
+  GW = Math.max(80, w); GH = Math.max(80, h);
   gcv.width = Math.round(GW * DPR); gcv.height = Math.round(GH * DPR);
-  gcv.style.width = GW + 'px'; gcv.style.height = GH + 'px';
   gx.setTransform(DPR, 0, 0, DPR, 0, 0);
   GCX = GW / 2; GCY = GH / 2;
   GR = Math.min(GW, GH) * 0.5 * ZOOMF;
+  SURF.key = '';                       // the cached sphere is the wrong size now
+}
+
+/** Cheap per-frame check that the buffers still match the laid-out boxes. */
+function sizeGuard() {
+  const w = gcv.clientWidth, h = gcv.clientHeight;
+  if (w > 0 && h > 0 && (Math.abs(w - GW) > 1 || Math.abs(h - GH) > 1)) {
+    resizeGlobe(); resizeChron(); resizeKrail();
+    markAll();
+    return true;
+  }
+  return false;
 }
 
 /* ------------------------------------------------------------ ring drawing */
@@ -1714,10 +1741,11 @@ const CH_H = TICK_H + FACT_H + RIBBON_H + 4;
 let CW = 0, SCALE = null;
 
 function resizeChron() {
-  const r = ccv.parentElement.getBoundingClientRect();
-  CW = Math.max(120, r.width);
+  // Width comes from CSS (100% of the section); only the height is content-led,
+  // so only the height may be written as an inline style. See resizeGlobe.
+  CW = Math.max(120, ccv.clientWidth || ccv.parentElement.getBoundingClientRect().width);
   ccv.width = Math.round(CW * DPR); ccv.height = Math.round(CH_H * DPR);
-  ccv.style.width = CW + 'px'; ccv.style.height = CH_H + 'px';
+  ccv.style.height = CH_H + 'px';
   cx2.setTransform(DPR, 0, 0, DPR, 0, 0);
 }
 
@@ -1967,8 +1995,8 @@ let KW = 0, KH = 0;
 const KPAD = 18;
 
 function resizeKrail() {
-  const r = kcv.getBoundingClientRect();
-  KW = Math.max(40, r.width); KH = Math.max(80, r.height);
+  KW = Math.max(40, kcv.clientWidth || kcv.getBoundingClientRect().width);
+  KH = Math.max(80, kcv.clientHeight || kcv.getBoundingClientRect().height);
   kcv.width = Math.round(KW * DPR); kcv.height = Math.round(KH * DPR);
   kx.setTransform(DPR, 0, 0, DPR, 0, 0);
 }
@@ -2686,6 +2714,8 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
+
+  sizeGuard();
 
   if (TW) {
     TW.t += dt;

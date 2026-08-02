@@ -23,10 +23,11 @@ const CH_H = TICK_H + FACT_H + RIBBON_H + 4;
 let CW = 0, SCALE = null;
 
 function resizeChron() {
-  const r = ccv.parentElement.getBoundingClientRect();
-  CW = Math.max(120, r.width);
+  // Width comes from CSS (100% of the section); only the height is content-led,
+  // so only the height may be written as an inline style. See resizeGlobe.
+  CW = Math.max(120, ccv.clientWidth || ccv.parentElement.getBoundingClientRect().width);
   ccv.width = Math.round(CW * DPR); ccv.height = Math.round(CH_H * DPR);
-  ccv.style.width = CW + 'px'; ccv.style.height = CH_H + 'px';
+  ccv.style.height = CH_H + 'px';
   cx2.setTransform(DPR, 0, 0, DPR, 0, 0);
 }
 

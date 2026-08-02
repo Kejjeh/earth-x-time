@@ -367,6 +367,8 @@ function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
 
+  sizeGuard();
+
   if (TW) {
     TW.t += dt;
     const p = Math.min(1, TW.t / TW.dur), e = ease(p);

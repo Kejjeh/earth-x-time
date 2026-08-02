@@ -11,8 +11,8 @@ let KW = 0, KH = 0;
 const KPAD = 18;
 
 function resizeKrail() {
-  const r = kcv.getBoundingClientRect();
-  KW = Math.max(40, r.width); KH = Math.max(80, r.height);
+  KW = Math.max(40, kcv.clientWidth || kcv.getBoundingClientRect().width);
+  KH = Math.max(80, kcv.clientHeight || kcv.getBoundingClientRect().height);
   kcv.width = Math.round(KW * DPR); kcv.height = Math.round(KH * DPR);
   kx.setTransform(DPR, 0, 0, DPR, 0, 0);
 }
