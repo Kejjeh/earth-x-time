@@ -144,7 +144,14 @@ button { background: none; border: none; cursor: pointer; padding: 0; }
   display: grid;
   grid-template-columns: var(--panel-w) minmax(0,1fr) var(--rail-w);
   grid-template-rows: minmax(0,1fr) auto;
-  height: 100%;
+  /* Viewport units, not height:100%. A percentage height resolves against the
+     parent's height, so it needs an unbroken chain of sized ancestors all the
+     way to <html>. Standalone that holds, because this file supplies its own
+     html and body — but embedded in a host page it does not, and the whole
+     layout collapses to zero with the globe inside it. */
+  height: 100vh;
+  height: 100dvh;
+  min-height: 420px;
   width: 100%;
 }
 .instrument { grid-column: 1; grid-row: 1 / span 2; border-right: 1px solid var(--rule);
@@ -396,7 +403,7 @@ button { background: none; border: none; cursor: pointer; padding: 0; }
 }
 @media (max-width: 860px) {
   body { overflow: auto; }
-  .app { grid-template-columns: minmax(0,1fr) var(--rail-w); grid-template-rows: 46vh auto auto; height: auto; min-height: 100%; }
+  .app { grid-template-columns: minmax(0,1fr) var(--rail-w); grid-template-rows: 46vh auto auto; height: auto; min-height: 100vh; min-height: 100dvh; }
   .stage { grid-column: 1; grid-row: 1; }
   .krail { grid-column: 2; grid-row: 1 / span 2; }
   .chron { grid-column: 1; grid-row: 2; }
