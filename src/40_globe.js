@@ -10,6 +10,127 @@ const gx = gcv.getContext('2d');
 let GW = 0, GH = 0, GR = 0, GCX = 0, GCY = 0, DPR = 1;
 let ZOOMF = 0.86;
 
+/* ============================================================================
+   SATELLITE SURFACE
+   NASA Blue Marble, equirectangular, inlined. Painted by inverse-projecting
+   every pixel of the disc back to a longitude and latitude and sampling the
+   texture — the honest way to put a real image on an orthographic sphere.
+   asin and atan2 per pixel are the cost, so the buffer drops to half linear
+   resolution while the globe is moving and sharpens the moment it stops.
+   ========================================================================== */
+const TEX = { w: 0, h: 0, data: null, ready: false };
+(function loadTexture() {
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const cc = c.getContext('2d', { willReadFrequently: true });
+    cc.drawImage(img, 0, 0);
+    const d = cc.getImageData(0, 0, c.width, c.height);
+    TEX.w = c.width; TEX.h = c.height; TEX.data = d.data; TEX.ready = true;
+    if (typeof markAll === 'function') markAll();
+  };
+  img.src = 'data:image/jpeg;base64,/*@EARTH@*/';
+})();
+
+/* Ray directions for the disc, in the *unrotated* view frame. Depends only on
+   canvas geometry, so it is rebuilt on resize and reused every frame. */
+const RAY = { scale: 0, w: 0, h: 0, nz: null, nx: null, ny: null, idx: null, buf: null, img: null };
+
+function buildRays(scale) {
+  const w = Math.max(1, Math.round(GW * scale)), h = Math.max(1, Math.round(GH * scale));
+  const cx = GCX * scale, cy = GCY * scale, r = GR * scale;
+  const n = w * h;
+  const nz = new Float32Array(n), nx = new Float32Array(n), ny = new Float32Array(n);
+  const idx = new Int32Array(n);
+  let k = 0;
+  for (let y = 0; y < h; y++) {
+    const dy = (y + 0.5 - cy) / r;
+    for (let x = 0; x < w; x++) {
+      const dx = (x + 0.5 - cx) / r;
+      const r2 = dx * dx + dy * dy;
+      if (r2 > 1) continue;
+      idx[k] = y * w + x;
+      nx[k] = dx; ny[k] = -dy; nz[k] = Math.sqrt(1 - r2);
+      k++;
+    }
+  }
+  RAY.scale = scale; RAY.w = w; RAY.h = h;
+  RAY.nz = nz; RAY.nx = nx; RAY.ny = ny; RAY.idx = idx; RAY.count = k;
+  RAY.img = gx.createImageData(w, h);
+  RAY.buf = new Uint32Array(RAY.img.data.buffer);
+}
+
+const INV_PI = 1 / Math.PI;
+
+/* The surface only changes when the globe turns, but the causal arcs animate
+   every frame. Caching the painted sphere turns an idle frame from a 7 ms
+   re-projection into a blit. */
+const SURF = { canvas: null, ctx: null, key: '' };
+
+function paintSatelliteCached(scale) {
+  const key = `${S.rot.lam.toFixed(3)}|${S.rot.phi.toFixed(3)}|${GR.toFixed(1)}|${scale}|${GW}x${GH}`;
+  if (SURF.key !== key || !SURF.canvas) {
+    if (!paintSatellite(scale)) return false;
+    SURF.key = key;
+  }
+  gx.imageSmoothingEnabled = true;
+  gx.drawImage(SURF.canvas, 0, 0, SURF.canvas.width, SURF.canvas.height, 0, 0, GW, GH);
+  return true;
+}
+
+function paintSatellite(scale) {
+  if (!TEX.ready) return false;
+  if (RAY.scale !== scale || RAY.w !== Math.round(GW * scale)) buildRays(scale);
+  const { nz, nx, ny, idx, buf, count } = RAY;
+  const tw = TEX.w, th = TEX.h, td = TEX.data;
+  const m0 = M[0], m1 = M[1], m2 = M[2], m3 = M[3], m4 = M[4],
+        m5 = M[5], m6 = M[6], m7 = M[7], m8 = M[8];
+
+  buf.fill(0);
+  for (let i = 0; i < count; i++) {
+    const a = nz[i], b = nx[i], c = ny[i];
+    // M is orthonormal, so the inverse is the transpose: world = Mᵀ · view
+    const px = m0 * a + m3 * b + m6 * c;
+    const py = m1 * a + m4 * b + m7 * c;
+    const pz = m2 * a + m5 * b + m8 * c;
+
+    let u = (Math.atan2(py, px) * INV_PI + 1) * 0.5 * tw;
+    let v = (0.5 - Math.asin(pz > 1 ? 1 : pz < -1 ? -1 : pz) * INV_PI) * th;
+    u = u < 0 ? 0 : u >= tw ? tw - 1 : u | 0;
+    v = v < 0 ? 0 : v >= th ? th - 1 : v | 0;
+    const t = (v * tw + u) << 2;
+
+    // Limb darkening: a sphere lit from the viewer still falls off at the rim.
+    const sh = 0.45 + 0.55 * a;
+    buf[idx[i]] = 0xff000000 |
+      ((td[t + 2] * sh) << 16) |
+      ((td[t + 1] * sh) << 8) |
+      (td[t] * sh);
+  }
+  if (!SURF.canvas) {
+    SURF.canvas = document.createElement('canvas');
+    SURF.ctx = SURF.canvas.getContext('2d');
+  }
+  if (SURF.canvas.width !== RAY.w || SURF.canvas.height !== RAY.h) {
+    SURF.canvas.width = RAY.w; SURF.canvas.height = RAY.h;
+  }
+  SURF.ctx.putImageData(RAY.img, 0, 0);
+  return true;
+}
+
+/* A thin blue shell just outside the limb, the way Earth reads from orbit. */
+function paintAtmosphere() {
+  const g = gx.createRadialGradient(GCX, GCY, GR * 0.985, GCX, GCY, GR * 1.10);
+  g.addColorStop(0, 'rgba(126,186,232,0.55)');
+  g.addColorStop(0.35, 'rgba(96,158,214,0.22)');
+  g.addColorStop(1, 'rgba(70,130,190,0)');
+  gx.beginPath();
+  gx.arc(GCX, GCY, GR * 1.10, 0, 7);
+  gx.fillStyle = g;
+  gx.fill();
+}
+
 const M = new Float64Array(9);
 function buildMatrix() {
   const l = S.rot.lam * Math.PI / 180, p = S.rot.phi * Math.PI / 180;
@@ -280,6 +401,13 @@ function drawMarker(sx, sy, sig, color, status, opts) {
     gx.stroke(); gx.setLineDash([]);
   }
 
+  // Over satellite imagery a marker can land on sunlit desert the same value as
+  // its own fill. A dark contact ring keeps every subject colour readable.
+  if (opts.onImagery) {
+    gx.beginPath(); gx.arc(sx, sy, r + 1.6, 0, 7);
+    gx.fillStyle = 'rgba(4,10,16,0.55)'; gx.fill();
+  }
+
   gx.beginPath(); gx.arc(sx, sy, r, 0, 7);
   if (status === 'consensus') { gx.fillStyle = color; gx.fill(); }
   else if (status === 'contested') {
@@ -312,9 +440,9 @@ function drawLabel(sx, sy, text, color, boxes, strong) {
     if (hit) continue;
     if (bx < 4 || bx + w > GW - 4 || by < 12 || by > GH - 6) continue;
     boxes.push(box);
-    gx.fillStyle = withAlpha(CSSV.abyss, 0.72);
+    gx.fillStyle = ON_IMAGERY ? 'rgba(4,10,16,0.66)' : withAlpha(CSSV.abyss, 0.72);
     gx.fillRect(box[0], box[1], box[2], box[3]);
-    gx.fillStyle = strong ? CSSV.chalk : color;
+    gx.fillStyle = strong ? (ON_IMAGERY ? '#F2F7FA' : CSSV.chalk) : color;
     gx.fillText(text, bx, by);
     return true;
   }
@@ -323,6 +451,7 @@ function drawLabel(sx, sy, text, color, boxes, strong) {
 
 /* ------------------------------------------------------------------- render */
 let arcPhase = 0;
+let ON_IMAGERY = false;   // label scrims darken over satellite imagery
 
 function drawGlobe(dt) {
   const F = facts();
@@ -330,25 +459,38 @@ function drawGlobe(dt) {
   HIT.length = 0;
   gx.clearRect(0, 0, GW, GH);
 
-  // ocean
-  const grd = gx.createRadialGradient(GCX - GR * 0.3, GCY - GR * 0.35, GR * 0.1, GCX, GCY, GR);
-  grd.addColorStop(0, CSSV['ocean-hi']); grd.addColorStop(1, CSSV['ocean-lo']);
-  gx.beginPath(); gx.arc(GCX, GCY, GR, 0, 7); gx.fillStyle = grd; gx.fill();
+  const moving = !!gDrag || Math.abs(S.spin.lam) > 0.01 || Math.abs(S.spin.phi) > 0.01 || !!TW;
+  const satellite = S.basemap === 'satellite' && TEX.ready;
+  ON_IMAGERY = satellite;
+
+  if (satellite) {
+    paintAtmosphere();
+    paintSatelliteCached(moving ? 0.5 : 1);
+  } else {
+    const grd = gx.createRadialGradient(GCX - GR * 0.3, GCY - GR * 0.35, GR * 0.1, GCX, GCY, GR);
+    grd.addColorStop(0, CSSV['ocean-hi']); grd.addColorStop(1, CSSV['ocean-lo']);
+    gx.beginPath(); gx.arc(GCX, GCY, GR, 0, 7); gx.fillStyle = grd; gx.fill();
+  }
 
   gx.save();
   gx.beginPath(); gx.arc(GCX, GCY, GR, 0, 7); gx.clip();
 
   // graticule
-  gx.strokeStyle = withAlpha(CSSV['land-edge'], 0.16); gx.lineWidth = 0.5;
+  gx.strokeStyle = satellite ? 'rgba(255,255,255,0.13)' : withAlpha(CSSV['land-edge'], 0.16);
+  gx.lineWidth = 0.5;
   for (const g of GRAT) strokePolyline(g);
 
-  // land
-  gx.fillStyle = CSSV.land; gx.strokeStyle = CSSV['land-edge']; gx.lineWidth = 0.7;
-  for (let i = 0; i < LAND.length; i++) drawLandRing(LAND[i], LAND_CCW[i]);
+  // coastlines: the whole basemap in chart mode, nothing at all over imagery
+  if (!satellite) {
+    gx.fillStyle = CSSV.land; gx.strokeStyle = CSSV['land-edge']; gx.lineWidth = 0.7;
+    for (let i = 0; i < LAND.length; i++) drawLandRing(LAND[i], LAND_CCW[i]);
+  }
 
   // plate boundaries — a geological-survey underlay, drawn over the land it cuts
   if (S.showPlates) {
-    gx.strokeStyle = CSSV.plate; gx.lineWidth = 0.9; gx.setLineDash([3, 2.5]);
+    gx.strokeStyle = satellite ? 'rgba(255,196,120,0.62)' : CSSV.plate;
+    gx.lineWidth = satellite ? 1.1 : 0.9;
+    gx.setLineDash([3, 2.5]);
     for (const p of PLATE) strokePolyline(p);
     gx.setLineDash([]);
   }
@@ -357,7 +499,8 @@ function drawGlobe(dt) {
 
   // limb
   gx.beginPath(); gx.arc(GCX, GCY, GR, 0, 7);
-  gx.strokeStyle = withAlpha(CSSV['land-edge'], 0.7); gx.lineWidth = 1; gx.stroke();
+  gx.strokeStyle = satellite ? 'rgba(150,200,240,0.5)' : withAlpha(CSSV['land-edge'], 0.7);
+  gx.lineWidth = 1; gx.stroke();
 
   /* ---- planet-wide facts ride the horizon rather than pretending to be dots */
   const globals = F.visible.filter(i => i.res.geometry.mode === 'global');
@@ -456,7 +599,8 @@ function drawGlobe(dt) {
       col, st, {
         selected: it.id === S.selection,
         dimmed: it.dimmed,
-        disputed: it.res.disputed
+        disputed: it.res.disputed,
+        onImagery: satellite
       });
 
     if (it.rolledUp) {

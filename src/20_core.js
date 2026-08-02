@@ -221,6 +221,7 @@ const S = {
   selection: null,
   hover: null,
   showPlates: true,
+  basemap: 'satellite',          // 'satellite' | 'chart'
   rot: { lam: 30, phi: 12 },
   spin: { lam: 0, phi: 0 },
   tour: -1,

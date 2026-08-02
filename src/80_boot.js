@@ -264,6 +264,15 @@ elDetail.addEventListener('click', e => {
   elDetail.scrollTop = 0;
 });
 
+document.getElementById('btn-basemap').addEventListener('click', e => {
+  S.basemap = S.basemap === 'satellite' ? 'chart' : 'satellite';
+  const sat = S.basemap === 'satellite';
+  e.currentTarget.setAttribute('aria-pressed', String(sat));
+  e.currentTarget.textContent = sat ? 'Satellite' : 'Chart';
+  document.getElementById('stage').classList.toggle('space', sat);
+  needGlobe = true;
+});
+
 document.getElementById('btn-plates').addEventListener('click', e => {
   S.showPlates = !S.showPlates;
   e.currentTarget.setAttribute('aria-pressed', String(S.showPlates));
@@ -408,6 +417,7 @@ function frame(now) {
 /* ------------------------------------------------------------------- start */
 function boot() {
   readPalette();
+  document.getElementById('stage').classList.toggle('space', S.basemap === 'satellite');
   resizeGlobe(); resizeChron(); resizeKrail();
   document.getElementById('resnote').textContent = RESOLVER_NOTE.consensus;
   for (const [id, css] of [['lg-solid', `background:${CSSV['sub-geology']}`],

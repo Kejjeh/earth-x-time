@@ -145,6 +145,8 @@ button { background: none; border: none; cursor: pointer; padding: 0; }
 .instrument { grid-column: 1; grid-row: 1 / span 2; border-right: 1px solid var(--rule);
   background: var(--shale); display: flex; flex-direction: column; min-height: 0; }
 .stage { grid-column: 2; grid-row: 1; position: relative; min-height: 0; overflow: hidden; }
+/* Imagery of a lit planet wants to sit in space, not on a slate panel. */
+.stage.space { background: radial-gradient(ellipse at 50% 45%, #0a1220 0%, #05080e 60%, #03050a 100%); }
 .krail { grid-column: 3; grid-row: 1 / span 2; border-left: 1px solid var(--rule);
   background: var(--shale); position: relative; display: flex; flex-direction: column; }
 .chron { grid-column: 2; grid-row: 2; border-top: 1px solid var(--rule); background: var(--shale);

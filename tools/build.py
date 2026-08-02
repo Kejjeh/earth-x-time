@@ -31,6 +31,7 @@ def main():
     land = coast.split("===LAND===")[1].split("===PLATES===")[0].strip()
     plates = coast.split("===PLATES===")[1].strip()
 
+    earth = read(os.path.join(ASSETS, "earth.txt")).strip()
     ics = json.load(open(os.path.join(ASSETS, "ics.json"), encoding="utf-8"))
     graph = json.load(open(os.path.join(SRC, "graph.json"), encoding="utf-8"))
 
@@ -44,6 +45,7 @@ def main():
     head = head.replace("/*@FONTS@*/", fonts)
     js = js.replace("/*@LAND@*/", land)
     js = js.replace("/*@PLATES@*/", plates)
+    js = js.replace("/*@EARTH@*/", earth)
     js = js.replace("/*@ICS@*/", json.dumps(ics, separators=(",", ":")))
     js = js.replace("/*@GRAPH@*/", json.dumps(graph, separators=(",", ":"), ensure_ascii=False))
 
@@ -71,12 +73,17 @@ def main():
                 '\n</head>\n<body>\n' + body +
                 '\n<script>\n' + js + '\n</script>\n</body>\n</html>\n')
 
+    # GitHub Pages serves index.html from the repo root.
+    out_idx = os.path.join(ROOT, "index.html")
+    with open(out_idx, "w", encoding="utf-8") as f:
+        f.write(open(out_std, encoding="utf-8").read())
+
     print(f"claims {len(graph['claims'])}  referents {len(graph['referents'])}  edges {len(graph['edges'])}")
     print(f"ics intervals {len(ics)}")
-    print(f"land {len(land):,} chars   plates {len(plates):,} chars")
+    print(f"land {len(land):,} chars   plates {len(plates):,} chars   earth {len(earth):,} chars")
     print(f"fonts {len(fonts):,} chars")
     print(f"js {len(js):,} chars")
-    for p in (out_std, out_art):
+    for p in (out_std, out_art, out_idx):
         print(f"  {os.path.basename(p):22} {os.path.getsize(p):,} bytes")
 
 
