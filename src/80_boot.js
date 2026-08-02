@@ -6,7 +6,7 @@
 
 let needGlobe = true, needChron = true, needKrail = true, needPanel = true;
 function markAll() { needGlobe = needChron = needKrail = needPanel = true; }
-function changed() { invalidate(); markAll(); }
+function changed() { invalidate(); markAll(); paintOnInput(); }
 
 function setKt(v) {
   const n = Math.max(KT_MIN, Math.min(KT_MAX, Math.round(v)));
@@ -46,6 +46,7 @@ gcv.addEventListener('pointermove', e => {
     if (gVel.length > 5) gVel.shift();
     gDrag = { x: e.clientX, y: e.clientY, t: performance.now() };
     needGlobe = true;
+    paintOnInput();
     return;
   }
   const mx = e.clientX - rect.left, my = e.clientY - rect.top;
@@ -55,7 +56,7 @@ gcv.addEventListener('pointermove', e => {
     if (d < h.r && d < bd) { bd = d; best = h; }
   }
   const id = best ? best.id : null;
-  if (id !== S.hover) { S.hover = id; needGlobe = true; }
+  if (id !== S.hover) { S.hover = id; needGlobe = true; paintOnInput(); }
   const tip = document.getElementById('tip');
   if (id) {
     const it = facts().items[id];
@@ -101,7 +102,7 @@ gcv.addEventListener('pointercancel', () => { gDrag = null; gcv.classList.remove
 gcv.addEventListener('wheel', e => {
   e.preventDefault();
   ZOOMF = Math.max(0.45, Math.min(3.2, ZOOMF * (e.deltaY > 0 ? 0.92 : 1.087)));
-  resizeGlobe(); needGlobe = true;
+  resizeGlobe(); needGlobe = true; paintOnInput();
 }, { passive: false });
 
 gcv.addEventListener('keydown', e => {
@@ -114,6 +115,7 @@ gcv.addEventListener('keydown', e => {
   else if (e.key === '-') { ZOOMF = Math.max(0.45, ZOOMF * 0.89); resizeGlobe(); needGlobe = true; }
   else if (e.key === 'Escape') setSelection(null);
   else return;
+  paintOnInput();
   e.preventDefault();
 });
 
@@ -149,14 +151,14 @@ ccv.addEventListener('pointermove', e => {
       if (d < h.r && d < bd) { bd = d; hit = h; }
     }
     const id = hit ? hit.id : null;
-    if (id !== S.hover) { S.hover = id; needChron = true; needGlobe = true; }
+    if (id !== S.hover) { S.hover = id; needChron = true; needGlobe = true; paintOnInput(); }
     ccv.style.cursor = hit ? 'pointer' : 'crosshair';
     return;
   }
   if (cDrag.mode === 'cursor') {
     const sc = SCALE || chronScale();
     S.cursor = Math.max(0, Math.min(T_MAX, sc.t(p.x)));
-    needChron = true; needPanel = true;
+    needChron = true; needPanel = true; paintOnInput();
   } else if (cDrag.mode === 'pan') {
     cDrag.moved += 1;
     const k = Math.max((cDrag.t1 - cDrag.t0) / 46, 1e-9);
@@ -201,7 +203,7 @@ ccv.addEventListener('keydown', e => {
   else if (e.key === '+' || e.key === '=') { setWindow(S.win.t0, S.win.t0 + span * 0.8); return e.preventDefault(); }
   else if (e.key === '-') { setWindow(S.win.t0, S.win.t0 + span * 1.25); return e.preventDefault(); }
   else return;
-  needChron = true; needPanel = true;
+  needChron = true; needPanel = true; paintOnInput();
   e.preventDefault();
 });
 
@@ -440,6 +442,26 @@ function frame(now) {
 function renderNow() {
   last = performance.now();
   try { render(0.016); } catch (err) { console.error('render failed', err); }
+}
+
+/*
+ * Paint straight from the input handler when rAF is not running.
+ *
+ * Where visibilityState is "hidden" rAF never fires, so the only thing painting
+ * is the watchdog — four frames a second, which makes dragging the globe feel
+ * broken. Pointer and wheel events are not throttled the way rAF and background
+ * timers are, so rendering inside the handler restores a smooth drag: the frame
+ * rate becomes the event rate. Throttled to ~90fps so a fast trackpad cannot
+ * queue more paints than we can serve, and guarded against re-entry.
+ */
+let painting = false;
+function rafIsLive() { return performance.now() - lastPaint < 250 && rafPending; }
+
+function paintOnInput() {
+  if (painting || rafIsLive()) return;
+  if (performance.now() - lastPaint < 11) return;
+  painting = true;
+  try { renderNow(); } finally { painting = false; }
 }
 
 /* If rAF has not painted recently and something is dirty, paint anyway. This is
