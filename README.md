@@ -75,6 +75,41 @@ host that supplies its own `<head>`). ~415 KB, entirely self-contained.
 | Fonts | IBM Plex Sans / Condensed / Mono, latin subset, inlined as data URIs | `tools/fetch_fonts.py` |
 | Seed graph | `src/graph.json`, validated and merged from generated clusters + `src/foundations.json` | `tools/validate_graph.py` |
 
+## Ingesting new facts
+
+```bash
+python tools/ingest.py "Chicxulub crater" "Great Oxidation Event"
+```
+
+Takes Wikidata items by name or QID, resolves every reference through Crossref,
+and emits schema-valid claims with DOIs to `src/ingested.json` for review. Names
+are accepted because hand-typed QIDs fail silently — Q13415 is Beta Canis
+Majoris, not the Chicxulub crater, and an ingester handed the wrong number will
+cheerfully emit a well-formed claim about a star. It prints what it matched.
+
+It enforces the product's own rule without mercy: **a statement carrying no
+resolvable reference produces no claim.** Which surfaces the main finding —
+across ten well-known items, 6 dated statements, 3 carrying any reference, and
+**1 resolving to a citation.** Wikidata is dependable for identity, coordinates,
+labels and subject hints. It is not a source of *sourced dates*.
+
+Referents adopt a QID, so re-running merges instead of minting
+`deccan_traps_2` beside `deccan_traps`. Matching is by QID first, then label.
+
+**What it deliberately does not do** is author the `status_timeline`. I tested
+the obvious idea — read consensus formation off citation history — and it fails:
+
+```
+Alvarez 1980, citations/year   1989:80  1990:67  1991:54  1992:76  1993:71
+```
+
+Citations *dip* across the 1991 Chicxulub confirmation. A contested paper is
+cited heavily *because* it is contested, so citation volume measures attention,
+not agreement. Every emitted claim gets a one-entry timeline and `_review: true`;
+the proposed → contested → consensus arc has to be authored.
+
+## Validation
+
 `tools/validate_graph.py` is a gate, not a formatter. It checks referential
 integrity, schema discipline and coordinate sanity, and it asserts the product's
 own promises: that the required cross-domain causal chain is wired end to end,

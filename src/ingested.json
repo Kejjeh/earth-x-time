@@ -1,0 +1,179 @@
+{
+ "referents": [
+  {
+   "id": "chicxulub_crater",
+   "label": "Chicxulub crater",
+   "kind": "event",
+   "wikidata": "Q55816",
+   "subjects": [
+    "geology",
+    "astronomy"
+   ]
+  },
+  {
+   "id": "cretaceous_paleogene_mass_extinction",
+   "label": "Cretaceous-Paleogene mass extinction",
+   "kind": "event",
+   "wikidata": "Q55811",
+   "subjects": [
+    "biology",
+    "geology"
+   ]
+  },
+  {
+   "id": "permian_triassic_mass_extinction",
+   "label": "Permian-Triassic mass extinction",
+   "kind": "event",
+   "wikidata": "Q141118",
+   "subjects": [
+    "biology",
+    "geology"
+   ]
+  },
+  {
+   "id": "siberian_traps",
+   "label": "Siberian Traps",
+   "kind": "entity",
+   "wikidata": "Q58808",
+   "subjects": [
+    "geology",
+    "chemistry"
+   ]
+  },
+  {
+   "id": "deccan_traps",
+   "label": "Deccan Traps",
+   "kind": "entity",
+   "wikidata": "Q55819",
+   "subjects": [
+    "geology",
+    "chemistry"
+   ]
+  },
+  {
+   "id": "great_oxygenation_event",
+   "label": "Great Oxygenation Event",
+   "kind": "event",
+   "wikidata": "Q837561",
+   "subjects": [
+    "chemistry",
+    "geology"
+   ]
+  },
+  {
+   "id": "minoan_eruption",
+   "label": "Minoan eruption",
+   "kind": "event",
+   "wikidata": "Q1144693",
+   "subjects": [
+    "geology",
+    "chemistry"
+   ]
+  },
+  {
+   "id": "jebel_irhoud",
+   "label": "Jebel Irhoud",
+   "kind": "entity",
+   "wikidata": "Q846913",
+   "subjects": [
+    "human_history",
+    "geology"
+   ]
+  },
+  {
+   "id": "snowball_earth",
+   "label": "Snowball Earth",
+   "kind": "entity",
+   "wikidata": "Q214689",
+   "subjects": [
+    "geology",
+    "chemistry"
+   ]
+  },
+  {
+   "id": "battle_of_hastings",
+   "label": "Battle of Hastings",
+   "kind": "event",
+   "wikidata": "Q83224",
+   "subjects": [
+    "human_history",
+    "geology"
+   ]
+  }
+ ],
+ "claims": [
+  {
+   "id": "clm_cretaceous_paleogene_mass_extinction_p585_920493",
+   "about": "cretaceous_paleogene_mass_extinction",
+   "statement": "Cretaceous-Paleogene mass extinction: point in time given as 66 Ma.",
+   "type": "dating",
+   "earth_time_start": 66002025.0,
+   "earth_time_end": 66002025.0,
+   "time_precision": 500000.0,
+   "geometry": {
+    "mode": "none",
+    "lat": null,
+    "lng": null,
+    "radius_km": null
+   },
+   "coords_are_modern": true,
+   "subjects": [
+    "biology",
+    "geology"
+   ],
+   "zoom_band": [
+    0,
+    10
+   ],
+   "significance": 1,
+   "asserted_by": "Lee et al. 2023, Journal of the Geological Society of Korea",
+   "knowledge_time": 2023,
+   "status_timeline": [
+    {
+     "knowledge_time": 2023,
+     "status": "proposed",
+     "source": "Lee et al. 2023, Journal of the Geological Society of Korea — doi:10.14770/jgsk.2023.006 — Wikidata rank 'normal' on Q55811 P585"
+    }
+   ],
+   "_review": true,
+   "_wikidata": {
+    "qid": "Q55811",
+    "property": "P585",
+    "rank": "normal"
+   },
+   "_doi": "10.14770/jgsk.2023.006",
+   "_resolved_via": "title-search",
+   "_cited_by": 3
+  }
+ ],
+ "edges": [],
+ "_report": {
+  "dropped": [
+   "Q55816 P571 (66,002,025 ybp): NO REFERENCE — no source, no fact",
+   "Q141118 P585 (251,902,025 ybp): 1 reference(s), none resolvable to a citation",
+   "Q837561 P585 (2,450,002,025 ybp): NO REFERENCE — no source, no fact",
+   "Q1144693 P585 (3,625 ybp): NO REFERENCE — no source, no fact",
+   "Q83224 P585 (959 ybp): 1 reference(s), none resolvable to a citation"
+  ],
+  "needs_subjects": [],
+  "no_geometry": [
+   "cretaceous_paleogene_mass_extinction (Q55811)",
+   "permian_triassic_mass_extinction (Q141118)",
+   "great_oxygenation_event (Q837561)",
+   "snowball_earth (Q214689)"
+  ],
+  "links": [
+   "siberian_traps: adopting Q58808 by label match — confirm same referent",
+   "deccan_traps: adopting Q55819 by label match — confirm same referent",
+   "snowball_earth: adopting Q214689 by label match — confirm same referent",
+   "battle_of_hastings: adopting Q83224 by label match — confirm same referent"
+  ],
+  "counts": {
+   "referents": 10,
+   "time_statements": 6,
+   "with_reference": 3,
+   "resolved": 1
+  }
+ },
+ "_note": "Every claim here is _review:true with a one-entry status_timeline. The proposed/contested/consensus arc is NOT derivable from any API and must be authored before merging."
+}
