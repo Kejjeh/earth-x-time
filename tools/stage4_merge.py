@@ -10,7 +10,16 @@ resolved (with their Wikidata QIDs), and writes src/graph.json.
 Refuses to merge anything that would violate the schema, and reports what it
 rejected rather than quietly dropping it.
 """
-import json, os, sys, argparse, collections
+import json, os, sys, argparse, collections, html
+
+
+def unescape(o):
+    """Agent output arrives HTML-escaped: 'Alvarez &amp; Asaro', DOIs with &lt;."""
+    if isinstance(o, dict):
+        return {k: unescape(v) for k, v in o.items()}
+    if isinstance(o, list):
+        return [unescape(v) for v in o]
+    return html.unescape(o) if isinstance(o, str) else o
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -84,17 +93,31 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
 
-    wf = load_workflow(a.workflow_output)
+    wf = unescape(load_workflow(a.workflow_output))
     new_claims = wf.get("claims", [])
     ing = json.load(open(a.ingested, encoding="utf-8"))
     graph = json.load(open(a.graph, encoding="utf-8"))
+
+    # Ingested ids that name something the graph already has under another id.
+    apath = os.path.join(ROOT, "src", "referent_aliases.json")
+    alias = {}
+    if os.path.exists(apath):
+        alias = {k: v for k, v in json.load(open(apath, encoding="utf-8")).items()
+                 if not k.startswith("_") and isinstance(v, str) and v}
 
     by_id = {r["id"]: r for r in graph["referents"]}
     # Referents that ingest.py resolved but the graph has not seen, plus QID
     # backfill onto ones it has: identity is the thing Wikidata is actually good
     # for, so take it even where the dates had to come from elsewhere.
-    added_refs, backfilled = [], []
+    added_refs, backfilled, aliased = [], [], []
     for r in ing.get("referents", []):
+        target = alias.get(r["id"])
+        if target and target in by_id:
+            # Same thing in the world: keep the graph's referent, take the QID.
+            if r.get("wikidata") and not by_id[target].get("wikidata"):
+                by_id[target]["wikidata"] = r["wikidata"]
+            aliased.append(f"{r['id']} -> {target} ({r.get('wikidata','no qid')})")
+            continue
         if r["id"] in by_id:
             if r.get("wikidata") and not by_id[r["id"]].get("wikidata"):
                 by_id[r["id"]]["wikidata"] = r["wikidata"]
@@ -112,6 +135,8 @@ def main():
 
     merged, rejected, dupes = [], [], []
     for c in new_claims:
+        if c.get("about") in alias:
+            c["about"] = alias[c["about"]]
         problems = check(c, known)
         if problems:
             rejected.append((c.get("id", "?"), c.get("about", "?"), problems))
@@ -130,6 +155,10 @@ def main():
     print(f"  already present     {len(dupes)}")
     print(f"referents added       {len(added_refs)}  {added_refs}")
     print(f"QIDs backfilled       {len(backfilled)}  {backfilled}")
+    if aliased:
+        print(f"ALIASED onto existing referents ({len(aliased)}) — no duplicates created:")
+        for x in aliased:
+            print("  -", x)
 
     if merged:
         withdoi = sum(1 for c in merged if c.get("doi"))

@@ -1,0 +1,12 @@
+{
+  "_comment": "Ingested referent id -> the id the graph already uses for the same thing in the world. The hand-authored seed predates Wikidata ids, so 'Chicxulub crater' slugs to chicxulub_crater while the graph calls it chicxulub_impact; merging blind puts the same crater on the globe twice. ingest.py catches exact and partial slug matches (siberian_traps, deccan_traps, snowball_earth, battle_of_hastings adopted their QIDs automatically) but cannot see that 'Minoan eruption' and 'Thera eruption' are one event. Those judgements live here, as data, and the QID rides across to the surviving referent so this is a one-time cost per referent rather than a recurring one.",
+
+  "chicxulub_crater": "chicxulub_impact",
+  "cretaceous_paleogene_mass_extinction": "kpg_extinction",
+  "permian_triassic_mass_extinction": "permian_triassic_extinction",
+  "great_oxygenation_event": "great_oxidation",
+  "minoan_eruption": "thera_eruption",
+
+  "_jebel_irhoud_note": "Kept as its own referent rather than folded into homo_sapiens: the claims date the site's hominin-bearing deposits, which is evidence for the species origin but not identical to it. The 315 ka result belongs to both, and an edge is the honest way to say so.",
+  "_": ""
+}
