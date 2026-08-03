@@ -6,7 +6,7 @@
 
 let needGlobe = true, needChron = true, needKrail = true, needPanel = true;
 function markAll() { needGlobe = needChron = needKrail = needPanel = true; }
-function changed() { invalidate(); markAll(); paintOnInput(); }
+function changed() { invalidate(); markAll(); paintOnInput(); writeHash(); }
 
 function setKt(v) {
   const n = Math.max(KT_MIN, Math.min(KT_MAX, Math.round(v)));
@@ -26,15 +26,76 @@ function setSelection(id) { S.selection = id; changed(); }
 let gDrag = null, gMoved = 0;
 const gVel = [];
 
+/* One clamp for the zoom, in one place. The wheel, the keyboard and the pinch
+   were otherwise each carrying their own copy of the same two magic numbers. */
+const ZMIN = 0.45, ZMAX = 3.2;
+function setZoom(z) {
+  const n = Math.max(ZMIN, Math.min(ZMAX, z));
+  if (n === ZOOMF) return false;
+  ZOOMF = n; resizeGlobe(); needGlobe = true;
+  return true;
+}
+
+/* Two-finger zoom.
+ *
+ * touch-action:none already routes touches here as pointer events, so one finger
+ * has always dragged; there was simply nothing listening for a second. Rather
+ * than a separate gesture recogniser, keep the set of live pointers and treat
+ * "two or more down" as the pinch state.
+ *
+ * The baseline is re-established whenever the set changes - a finger added, a
+ * finger lifted, a third finger landing - because otherwise the distance ratio
+ * is measured against a pair that no longer exists and the globe jumps. Same
+ * reason the last finger up hands back to a fresh drag origin instead of
+ * resuming the one from before the pinch. */
+const PTRS = new Map();
+let pinch = null;
+
+function pinchState() {
+  const it = PTRS.values();
+  const a = it.next().value, b = it.next().value;
+  if (!a || !b) return null;
+  return { d: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
+           mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
+}
+function rebasePinch() {
+  const s = pinchState();
+  pinch = s ? { d0: s.d, z0: ZOOMF, mx: s.mx, my: s.my } : null;
+}
+
 gcv.addEventListener('pointerdown', e => {
   try { gcv.setPointerCapture(e.pointerId); } catch (_) { /* drag works without capture */ }
-  gDrag = { x: e.clientX, y: e.clientY, t: performance.now() };
-  gMoved = 0; gVel.length = 0;
+  // A primary pointerdown means a gesture is starting with nothing else held, so
+  // it is also the moment to forget any pointer whose "up" we never received.
+  if (e.isPrimary) { PTRS.clear(); pinch = null; }
+  PTRS.set(e.pointerId, { x: e.clientX, y: e.clientY });
   S.spin.lam = S.spin.phi = 0;
+  gVel.length = 0;
   gcv.classList.add('dragging');
+  if (PTRS.size >= 2) {
+    gDrag = null;            // a pinch is not a drag...
+    gMoved = 999;            // ...and must not land as a click when it ends
+    rebasePinch();
+    return;
+  }
+  gDrag = { x: e.clientX, y: e.clientY, t: performance.now() };
+  gMoved = 0;
 });
 
 gcv.addEventListener('pointermove', e => {
+  if (PTRS.has(e.pointerId)) PTRS.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pinch && PTRS.size >= 2) {
+    const s = pinchState();
+    if (s) {
+      setZoom(pinch.z0 * (s.d / pinch.d0));
+      const k = 180 / (GR * Math.PI) * 1.1;
+      S.rot.lam += (s.mx - pinch.mx) * k;
+      S.rot.phi = Math.max(-89, Math.min(89, S.rot.phi + (s.my - pinch.my) * k));
+      pinch.mx = s.mx; pinch.my = s.my;
+      needGlobe = true; paintOnInput();
+    }
+    return;
+  }
   const rect = gcv.getBoundingClientRect();
   if (gDrag) {
     const dx = e.clientX - gDrag.x, dy = e.clientY - gDrag.y;
@@ -96,13 +157,30 @@ function endGlobeDrag(e) {
     setSelection(best ? best.id : null);
   }
 }
-gcv.addEventListener('pointerup', endGlobeDrag);
-gcv.addEventListener('pointercancel', () => { gDrag = null; gcv.classList.remove('dragging'); });
+/* Lifting a finger mid-pinch must not end the gesture, and must not be read as a
+   click. Only the last one up is a real pointerup. */
+gcv.addEventListener('pointerup', e => {
+  PTRS.delete(e.pointerId);
+  if (PTRS.size >= 2) { rebasePinch(); return; }
+  pinch = null;
+  if (PTRS.size === 1) {
+    const p = PTRS.values().next().value;
+    gDrag = { x: p.x, y: p.y, t: performance.now() };   // hand back without a jump
+    gMoved = 999; gVel.length = 0;
+    return;
+  }
+  endGlobeDrag(e);
+});
+gcv.addEventListener('pointercancel', e => {
+  PTRS.delete(e.pointerId);
+  if (PTRS.size < 2) pinch = null;
+  if (!PTRS.size) { gDrag = null; gcv.classList.remove('dragging'); }
+});
 
 gcv.addEventListener('wheel', e => {
   e.preventDefault();
-  ZOOMF = Math.max(0.45, Math.min(3.2, ZOOMF * (e.deltaY > 0 ? 0.92 : 1.087)));
-  resizeGlobe(); needGlobe = true; paintOnInput();
+  setZoom(ZOOMF * (e.deltaY > 0 ? 0.92 : 1.087));
+  paintOnInput();
 }, { passive: false });
 
 gcv.addEventListener('keydown', e => {
@@ -111,8 +189,8 @@ gcv.addEventListener('keydown', e => {
   else if (e.key === 'ArrowRight') { S.rot.lam += step; needGlobe = true; }
   else if (e.key === 'ArrowUp') { S.rot.phi = Math.min(89, S.rot.phi + step); needGlobe = true; }
   else if (e.key === 'ArrowDown') { S.rot.phi = Math.max(-89, S.rot.phi - step); needGlobe = true; }
-  else if (e.key === '+' || e.key === '=') { ZOOMF = Math.min(3.2, ZOOMF * 1.12); resizeGlobe(); needGlobe = true; }
-  else if (e.key === '-') { ZOOMF = Math.max(0.45, ZOOMF * 0.89); resizeGlobe(); needGlobe = true; }
+  else if (e.key === '+' || e.key === '=') setZoom(ZOOMF * 1.12);
+  else if (e.key === '-') setZoom(ZOOMF * 0.89);
   else if (e.key === 'Escape') setSelection(null);
   else return;
   paintOnInput();
@@ -482,6 +560,7 @@ function paintOnInput() {
   LAST_INPUT_AT = performance.now();
   lastInteraction = LAST_INPUT_AT;
   scheduleSharpen();
+  writeHash();                    // debounced; the URL settles when the gesture does
   if (painting || rafIsLive()) return;
   painting = true;
   try { renderNow(); } finally { painting = false; }
@@ -561,9 +640,9 @@ document.addEventListener('visibilitychange', () => {
 /* ------------------------------------------------------------------- start */
 function boot() {
   readPalette();
-  document.getElementById('stage').classList.toggle('space', S.basemap === 'satellite');
+  readHash();                     // a shared view wins over the defaults...
+  syncControls();                 // ...and the controls have to say so
   resizeGlobe(); resizeChron(); resizeKrail();
-  document.getElementById('resnote').textContent = RESOLVER_NOTE.consensus;
   /* readPalette() keys subjects as CSSV.geology, not CSSV['sub-geology']. Reading
      the wrong key passed undefined into withAlpha, which threw — and because
      this sits before requestAnimationFrame(frame), that silent TypeError meant
@@ -585,12 +664,21 @@ function boot() {
   renderNow();                    // paint once without waiting for rAF
   requestAnimationFrame(frame);   // then run the animation loop if it is available
   startHeartbeat();               // ...and a worker clock for when it is not
+  window.__BOOT_OK = true;
 }
 
-/* If boot ever throws again, the loop still starts. */
+/* If boot ever throws again, the loop still starts.
+
+   The flags are not debug scaffolding, they are the contract tools/smoke_test.py
+   checks. A boot that dies silently is this project's signature failure — it cost
+   the whole first build — and "the page looks fine in a screenshot" does not
+   detect it. Something has to be able to ask, from outside, whether boot ran. */
 function safeBoot() {
+  window.__BOOT_OK = false;
+  window.__BOOT_ERR = null;
   try { boot(); }
   catch (err) {
+    window.__BOOT_ERR = String((err && err.stack) || err);
     console.error('boot failed; starting the render loop anyway', err);
     try { markAll(); renderNow(); } catch (_) {}
     requestAnimationFrame(frame);

@@ -7,7 +7,7 @@ Emits two files with identical content:
   earth-x-time.html   full standalone document, for opening off disk
   artifact.html       body-only, for a host that supplies its own <head>
 """
-import json, os, re, sys
+import json, os, re, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -85,6 +85,30 @@ def main():
     print(f"js {len(js):,} chars")
     for p in (out_std, out_art, out_idx):
         print(f"  {os.path.basename(p):22} {os.path.getsize(p):,} bytes")
+
+    if "--no-smoke" not in sys.argv:
+        smoke()
+
+
+def smoke():
+    """Open the thing we just built in a real browser and prove it runs.
+
+    Not optional politeness. A build that emits a well-formed 637 KB document
+    whose boot() throws on line 3 is indistinguishable from a good one by every
+    check upstream of here - that is not hypothetical, it is what happened.
+    """
+    try:
+        import playwright  # noqa: F401
+    except ImportError:
+        print("\n(skipping smoke test: pip install playwright && playwright install chromium)")
+        return
+    print("\nsmoke test")
+    r = subprocess.run([sys.executable, os.path.join(HERE, "smoke_test.py")],
+                       capture_output=True, text=True)
+    tail = [l for l in r.stdout.splitlines() if "FAIL" in l or "checks passed" in l]
+    print("\n".join("  " + l.strip() for l in tail) or r.stdout[-800:])
+    if r.returncode:
+        sys.exit("FATAL: the built page does not work - see above")
 
 
 if __name__ == "__main__":

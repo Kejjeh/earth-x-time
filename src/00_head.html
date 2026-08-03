@@ -212,6 +212,36 @@ button { background: none; border: none; cursor: pointer; padding: 0; }
 .sub .cnt { margin-left: auto; font-family: var(--font-data); font-size: 10px; color: var(--chalk-faint); font-variant-numeric: tabular-nums; }
 .subs-hint { margin: 7px 0 0; font-size: 10.5px; color: var(--chalk-faint); }
 
+/* ============================================================ SEARCH */
+.search {
+  width: 100%; box-sizing: border-box;
+  background: var(--shale-2); border: 1px solid var(--rule); border-radius: var(--r);
+  color: var(--chalk); font-family: var(--font-body); font-size: 12.5px;
+  padding: 7px 9px; outline: none; transition: border-color .12s, background .12s;
+}
+.search::placeholder { color: var(--chalk-faint); }
+.search:focus { border-color: var(--cyanotype); background: var(--shale-3); }
+.results {
+  list-style: none; margin: 6px 0 0; padding: 0;
+  max-height: 236px; overflow-y: auto; scrollbar-width: thin;
+  border: 1px solid var(--rule); border-radius: var(--r); background: var(--shale-2);
+}
+.results:empty { display: none; border: 0; }
+.results li {
+  display: flex; align-items: baseline; gap: 8px; cursor: pointer;
+  padding: 6px 9px; font-size: 12px; color: var(--chalk-dim);
+  border-bottom: 1px solid var(--rule-soft);
+}
+.results li:last-child { border-bottom: 0; }
+.results li:hover, .results li[aria-selected="true"] { background: var(--shale-3); color: var(--chalk); }
+.results li .when {
+  margin-left: auto; flex: none; font-family: var(--font-data); font-size: 10px;
+  color: var(--chalk-faint); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.results li .when.later { color: var(--cyanotype); }
+.results li mark { background: none; color: var(--ochre); font-weight: 600; }
+.search-note { margin: 6px 0 0; font-size: 10.5px; color: var(--chalk-faint); }
+
 /* ============================================================ DETAIL */
 .detail { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; min-height: 0; scrollbar-width: thin; }
 .detail::-webkit-scrollbar { width: 8px; }

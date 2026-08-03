@@ -219,6 +219,36 @@ button { background: none; border: none; cursor: pointer; padding: 0; }
 .sub .cnt { margin-left: auto; font-family: var(--font-data); font-size: 10px; color: var(--chalk-faint); font-variant-numeric: tabular-nums; }
 .subs-hint { margin: 7px 0 0; font-size: 10.5px; color: var(--chalk-faint); }
 
+/* ============================================================ SEARCH */
+.search {
+  width: 100%; box-sizing: border-box;
+  background: var(--shale-2); border: 1px solid var(--rule); border-radius: var(--r);
+  color: var(--chalk); font-family: var(--font-body); font-size: 12.5px;
+  padding: 7px 9px; outline: none; transition: border-color .12s, background .12s;
+}
+.search::placeholder { color: var(--chalk-faint); }
+.search:focus { border-color: var(--cyanotype); background: var(--shale-3); }
+.results {
+  list-style: none; margin: 6px 0 0; padding: 0;
+  max-height: 236px; overflow-y: auto; scrollbar-width: thin;
+  border: 1px solid var(--rule); border-radius: var(--r); background: var(--shale-2);
+}
+.results:empty { display: none; border: 0; }
+.results li {
+  display: flex; align-items: baseline; gap: 8px; cursor: pointer;
+  padding: 6px 9px; font-size: 12px; color: var(--chalk-dim);
+  border-bottom: 1px solid var(--rule-soft);
+}
+.results li:last-child { border-bottom: 0; }
+.results li:hover, .results li[aria-selected="true"] { background: var(--shale-3); color: var(--chalk); }
+.results li .when {
+  margin-left: auto; flex: none; font-family: var(--font-data); font-size: 10px;
+  color: var(--chalk-faint); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.results li .when.later { color: var(--cyanotype); }
+.results li mark { background: none; color: var(--ochre); font-weight: 600; }
+.search-note { margin: 6px 0 0; font-size: 10.5px; color: var(--chalk-faint); }
+
 /* ============================================================ DETAIL */
 .detail { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; min-height: 0; scrollbar-width: thin; }
 .detail::-webkit-scrollbar { width: 8px; }
@@ -436,6 +466,15 @@ button { background: none; border: none; cursor: pointer; padding: 0; }
     </div>
 
     <div class="controls">
+      <div class="group">
+        <label class="lbl" for="search">Find</label>
+        <input class="search" id="search" type="search" autocomplete="off" spellcheck="false"
+               placeholder="a fact, a place, a paper&hellip;"
+               role="combobox" aria-expanded="false" aria-controls="results" aria-autocomplete="list" />
+        <ul class="results" id="results" role="listbox" aria-label="Search results"></ul>
+        <p class="search-note" id="search-note"></p>
+      </div>
+
       <div class="group">
         <span class="lbl" id="lbl-res">When claims disagree</span>
         <div class="seg" role="group" aria-labelledby="lbl-res" id="resolver">
@@ -2372,6 +2411,283 @@ function renderSubjects() {
 }
 
 /* ============================================================================
+   SEARCH
+
+   Forty-six referents is small enough that any indexing beyond a linear scan
+   would be theatre. What is worth doing is searching the CLAIMS, not just the
+   labels: "iridium", "Alvarez", "zircon" and "clumped isotopes" are how anyone
+   who knows this material would look for it, and none of them appear in a
+   referent's name.
+
+   The result rows carry the date as resolved AT THE CURRENT KNOWLEDGE-TIME,
+   which means a search can honestly answer "we did not know that yet". Choosing
+   such a result moves knowledge-time forward to the year the claim was first
+   made rather than selecting something the page would then refuse to draw.
+   ========================================================================== */
+
+const SEARCH_IDX = (() => {
+  const out = [];
+  for (const id in R.referents) {
+    const claims = R.byRef[id] || [];
+    out.push({
+      id,
+      label: R.referents[id].label,
+      low: R.referents[id].label.toLowerCase(),
+      body: claims.map(c => `${c.statement} ${c.asserted_by}`).join(' ').toLowerCase(),
+      first: claims.reduce((m, c) => Math.min(m, c.knowledge_time), Infinity)
+    });
+  }
+  return out;
+})();
+
+function searchFacts(qs) {
+  const s = qs.trim().toLowerCase();
+  if (s.length < 2) return [];
+  const hits = [];
+  for (const e of SEARCH_IDX) {
+    const i = e.low.indexOf(s);
+    let score = 0, where = 'label';
+    if (i === 0) score = 100;
+    else if (i > 0) score = /[\s(-]/.test(e.low[i - 1]) ? 82 : 62;
+    else if (e.body.indexOf(s) >= 0) { score = 30; where = 'claim'; }
+    else continue;
+    hits.push({ ...e, score, where });
+  }
+  hits.sort((a, b) => b.score - a.score || a.label.length - b.label.length);
+  return hits.slice(0, 8);
+}
+
+const elSearch = document.getElementById('search');
+const elResults = document.getElementById('results');
+const elSearchNote = document.getElementById('search-note');
+let SR = { hits: [], cursor: -1 };
+
+function hilite(label, s) {
+  const i = label.toLowerCase().indexOf(s.toLowerCase());
+  if (i < 0) return esc(label);
+  return esc(label.slice(0, i)) + '<mark>' + esc(label.slice(i, i + s.length)) +
+    '</mark>' + esc(label.slice(i + s.length));
+}
+
+function renderResults() {
+  const s = elSearch.value.trim();
+  elResults.innerHTML = SR.hits.map((h, i) => {
+    const res = resolve(h.id, S.kt, S.resolver);
+    const when = res
+      ? `<span class="when">${fmtYbp(res.winner ? res.winner.claim.earth_time_start : res.pos)}</span>`
+      : `<span class="when later">first claimed ${h.first}</span>`;
+    return `<li role="option" id="sr-${i}" data-id="${esc(h.id)}"` +
+      ` aria-selected="${i === SR.cursor}">${hilite(h.label, s)}${when}</li>`;
+  }).join('');
+  elSearch.setAttribute('aria-expanded', String(SR.hits.length > 0));
+  elSearch.setAttribute('aria-activedescendant', SR.cursor >= 0 ? `sr-${SR.cursor}` : '');
+  const byClaim = SR.hits.filter(h => h.where === 'claim').length;
+  elSearchNote.textContent = !s || s.length < 2 ? ''
+    : !SR.hits.length ? 'nothing matches'
+    : byClaim ? `${byClaim} matched inside a claim, not a title` : '';
+}
+
+function closeResults() {
+  SR = { hits: [], cursor: -1 };
+  elResults.innerHTML = '';
+  elSearch.setAttribute('aria-expanded', 'false');
+  elSearchNote.textContent = '';
+}
+
+function chooseResult(id) {
+  if (!R.referents[id]) return;
+  const claims = R.byRef[id] || [];
+  let kt = S.kt;
+  const first = claims.reduce((m, c) => Math.min(m, c.knowledge_time), Infinity);
+  // Nothing to show at the current knowledge-time: move to the year it entered
+  // the record rather than selecting something that cannot be drawn.
+  if (isFinite(first) && first > kt) kt = Math.min(KT_MAX, first);
+  const res = resolve(id, kt, S.resolver);
+  const t1 = res && isFinite(res.oldest)
+    ? Math.max(2000, Math.min(T_MAX, res.oldest * 1.7))
+    : S.win.t1;
+  flyTo({ id, kt, win: [0, t1] });
+  closeResults();
+  elSearch.blur();
+}
+
+let searchTimer = null;
+elSearch.addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    SR = { hits: searchFacts(elSearch.value), cursor: -1 };
+    renderResults();
+  }, 90);
+});
+
+elSearch.addEventListener('keydown', e => {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    const n = SR.hits.length;
+    if (!n) return;
+    SR.cursor = e.key === 'ArrowDown'
+      ? (SR.cursor >= n - 1 ? 0 : SR.cursor + 1)
+      : (SR.cursor <= 0 ? n - 1 : SR.cursor - 1);
+    renderResults();
+    const el = document.getElementById('sr-' + SR.cursor);
+    if (el) el.scrollIntoView({ block: 'nearest' });
+    e.preventDefault();
+  } else if (e.key === 'Enter') {
+    const h = SR.hits[SR.cursor >= 0 ? SR.cursor : 0];
+    if (h) chooseResult(h.id);
+    e.preventDefault();
+  } else if (e.key === 'Escape') {
+    if (SR.hits.length) closeResults(); else { elSearch.value = ''; elSearch.blur(); }
+    e.stopPropagation();
+  }
+});
+
+elResults.addEventListener('click', e => {
+  const li = e.target.closest('li[data-id]');
+  if (li) chooseResult(li.dataset.id);
+});
+
+/* "/" focuses search from anywhere, the way it does in every other tool that
+   has a search box. Not when the user is already typing into one. */
+document.addEventListener('keydown', e => {
+  if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  elSearch.focus();
+  elSearch.select();
+  e.preventDefault();
+});
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#search, #results')) closeResults();
+});
+
+/* ============================================================================
+   THE VIEW IN THE URL
+
+   Everything this page shows is a point in a small state space: two clocks, a
+   rotation, a zoom, a resolver mode, a subject filter and a selection. Until now
+   none of it left the tab, so "look at what happens to the K-Pg link in 1991"
+   was a set of instructions rather than a link.
+
+   Two rules the implementation has to respect:
+
+   1. A malformed hash must never stop the page. Every value is parsed
+      defensively, clamped to its own legal range, and checked against the data
+      before it is applied; the whole read is wrapped, and a failure returns
+      false and leaves the defaults alone. A URL is user input from a stranger.
+
+   2. history.replaceState throws in a sandboxed iframe with an opaque origin -
+      which is exactly where this page is often embedded. That is not worth
+      breaking a working page over, so the failure is swallowed and the page
+      simply has no shareable URL in that context.
+   ========================================================================== */
+
+let hashTimer = null;
+let hashSelf = '';                    // the last hash we wrote, so we can ignore our own event
+
+function encodeHash() {
+  const p = [];
+  p.push('k=' + S.kt);
+  p.push('t=' + Math.round(S.win.t0) + '_' + Math.round(S.win.t1));
+  p.push('r=' + S.rot.lam.toFixed(1) + ',' + S.rot.phi.toFixed(1));
+  p.push('z=' + ZOOMF.toFixed(2));
+  if (S.resolver !== 'consensus') p.push('m=' + S.resolver);
+  if (S.selection) p.push('s=' + S.selection);
+  if (S.focus) p.push('f=' + S.focus);
+  const off = SUBJECTS.filter(x => !S.subjects.has(x));
+  if (off.length) p.push('x=' + off.join('.'));
+  if (S.basemap !== 'satellite') p.push('b=' + S.basemap);
+  if (!S.showPlates) p.push('p=0');
+  return '#' + p.join('&');
+}
+
+function writeHash(now) {
+  clearTimeout(hashTimer);
+  const put = () => {
+    const h = encodeHash();
+    if (h === location.hash) return;
+    hashSelf = h;
+    try { history.replaceState(null, '', h); } catch (_) { /* opaque origin; carry on */ }
+  };
+  // Dragging the globe changes the rotation sixty times a second. Debounced, so
+  // the URL settles once the gesture does.
+  if (now) put(); else hashTimer = setTimeout(put, 400);
+}
+
+function readHash() {
+  try {
+    const raw = (location.hash || '').replace(/^#/, '');
+    if (!raw) return false;
+    const p = {};
+    for (const kv of raw.split('&')) {
+      const i = kv.indexOf('=');
+      if (i > 0) p[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1));
+    }
+    const num = (v, lo, hi, d) => {
+      const n = parseFloat(v);
+      return isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d;
+    };
+
+    S.kt = Math.round(num(p.k, KT_MIN, KT_MAX, S.kt));
+
+    if (p.t) {
+      const [a, b] = p.t.split('_');
+      const t0 = num(a, 0, T_MAX, S.win.t0), t1 = num(b, 0, T_MAX, S.win.t1);
+      if (t1 - t0 >= 50) { S.win.t0 = t0; S.win.t1 = t1; }
+    }
+    if (p.r) {
+      const [a, b] = p.r.split(',');
+      S.rot.lam = num(a, -100000, 100000, S.rot.lam);
+      S.rot.phi = num(b, -89, 89, S.rot.phi);
+    }
+    if (p.z) ZOOMF = num(p.z, ZMIN, ZMAX, ZOOMF);
+    if (p.m && ['consensus', 'frontier', 'spread'].includes(p.m)) S.resolver = p.m;
+    if (p.s && R.referents[p.s]) S.selection = p.s;
+    if (p.f && SUBJECTS.includes(p.f)) S.focus = p.f;
+    if (p.x) {
+      const off = new Set(p.x.split('.').filter(s => SUBJECTS.includes(s)));
+      // Turning every subject off would show an empty globe and look broken.
+      if (off.size < SUBJECTS.length) S.subjects = new Set(SUBJECTS.filter(s => !off.has(s)));
+    }
+    if (p.b === 'chart' || p.b === 'satellite') S.basemap = p.b;
+    if (p.p === '0') S.showPlates = false;
+    return true;
+  } catch (err) {
+    console.warn('unreadable view in the URL; using defaults', err);
+    return false;
+  }
+}
+
+/** Controls whose pressed state lives in the DOM rather than in a render pass. */
+function syncControls() {
+  for (const b of document.querySelectorAll('#resolver button')) {
+    b.setAttribute('aria-pressed', String(b.dataset.mode === S.resolver));
+  }
+  const note = document.getElementById('resnote');
+  if (note) note.textContent = RESOLVER_NOTE[S.resolver] || '';
+  const bm = document.getElementById('btn-basemap');
+  if (bm) {
+    const sat = S.basemap === 'satellite';
+    bm.setAttribute('aria-pressed', String(sat));
+    bm.textContent = sat ? 'Satellite' : 'Chart';
+  }
+  const pl = document.getElementById('btn-plates');
+  if (pl) pl.setAttribute('aria-pressed', String(S.showPlates));
+  const st = document.getElementById('stage');
+  if (st) st.classList.toggle('space', S.basemap === 'satellite');
+}
+
+/* Back, forward, and someone pasting a different view into the same tab. */
+window.addEventListener('hashchange', () => {
+  if (location.hash === hashSelf) return;
+  if (!readHash()) return;
+  syncControls();
+  resizeGlobe();
+  SURF.key = '';
+  changed();
+});
+
+/* ============================================================================
    WIRING
    Every control below does exactly one thing: mutate axis state and invalidate.
    Nothing filters anything itself — that is queryFacts's job.
@@ -2379,7 +2695,7 @@ function renderSubjects() {
 
 let needGlobe = true, needChron = true, needKrail = true, needPanel = true;
 function markAll() { needGlobe = needChron = needKrail = needPanel = true; }
-function changed() { invalidate(); markAll(); paintOnInput(); }
+function changed() { invalidate(); markAll(); paintOnInput(); writeHash(); }
 
 function setKt(v) {
   const n = Math.max(KT_MIN, Math.min(KT_MAX, Math.round(v)));
@@ -2399,15 +2715,76 @@ function setSelection(id) { S.selection = id; changed(); }
 let gDrag = null, gMoved = 0;
 const gVel = [];
 
+/* One clamp for the zoom, in one place. The wheel, the keyboard and the pinch
+   were otherwise each carrying their own copy of the same two magic numbers. */
+const ZMIN = 0.45, ZMAX = 3.2;
+function setZoom(z) {
+  const n = Math.max(ZMIN, Math.min(ZMAX, z));
+  if (n === ZOOMF) return false;
+  ZOOMF = n; resizeGlobe(); needGlobe = true;
+  return true;
+}
+
+/* Two-finger zoom.
+ *
+ * touch-action:none already routes touches here as pointer events, so one finger
+ * has always dragged; there was simply nothing listening for a second. Rather
+ * than a separate gesture recogniser, keep the set of live pointers and treat
+ * "two or more down" as the pinch state.
+ *
+ * The baseline is re-established whenever the set changes - a finger added, a
+ * finger lifted, a third finger landing - because otherwise the distance ratio
+ * is measured against a pair that no longer exists and the globe jumps. Same
+ * reason the last finger up hands back to a fresh drag origin instead of
+ * resuming the one from before the pinch. */
+const PTRS = new Map();
+let pinch = null;
+
+function pinchState() {
+  const it = PTRS.values();
+  const a = it.next().value, b = it.next().value;
+  if (!a || !b) return null;
+  return { d: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
+           mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
+}
+function rebasePinch() {
+  const s = pinchState();
+  pinch = s ? { d0: s.d, z0: ZOOMF, mx: s.mx, my: s.my } : null;
+}
+
 gcv.addEventListener('pointerdown', e => {
   try { gcv.setPointerCapture(e.pointerId); } catch (_) { /* drag works without capture */ }
-  gDrag = { x: e.clientX, y: e.clientY, t: performance.now() };
-  gMoved = 0; gVel.length = 0;
+  // A primary pointerdown means a gesture is starting with nothing else held, so
+  // it is also the moment to forget any pointer whose "up" we never received.
+  if (e.isPrimary) { PTRS.clear(); pinch = null; }
+  PTRS.set(e.pointerId, { x: e.clientX, y: e.clientY });
   S.spin.lam = S.spin.phi = 0;
+  gVel.length = 0;
   gcv.classList.add('dragging');
+  if (PTRS.size >= 2) {
+    gDrag = null;            // a pinch is not a drag...
+    gMoved = 999;            // ...and must not land as a click when it ends
+    rebasePinch();
+    return;
+  }
+  gDrag = { x: e.clientX, y: e.clientY, t: performance.now() };
+  gMoved = 0;
 });
 
 gcv.addEventListener('pointermove', e => {
+  if (PTRS.has(e.pointerId)) PTRS.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pinch && PTRS.size >= 2) {
+    const s = pinchState();
+    if (s) {
+      setZoom(pinch.z0 * (s.d / pinch.d0));
+      const k = 180 / (GR * Math.PI) * 1.1;
+      S.rot.lam += (s.mx - pinch.mx) * k;
+      S.rot.phi = Math.max(-89, Math.min(89, S.rot.phi + (s.my - pinch.my) * k));
+      pinch.mx = s.mx; pinch.my = s.my;
+      needGlobe = true; paintOnInput();
+    }
+    return;
+  }
   const rect = gcv.getBoundingClientRect();
   if (gDrag) {
     const dx = e.clientX - gDrag.x, dy = e.clientY - gDrag.y;
@@ -2469,13 +2846,30 @@ function endGlobeDrag(e) {
     setSelection(best ? best.id : null);
   }
 }
-gcv.addEventListener('pointerup', endGlobeDrag);
-gcv.addEventListener('pointercancel', () => { gDrag = null; gcv.classList.remove('dragging'); });
+/* Lifting a finger mid-pinch must not end the gesture, and must not be read as a
+   click. Only the last one up is a real pointerup. */
+gcv.addEventListener('pointerup', e => {
+  PTRS.delete(e.pointerId);
+  if (PTRS.size >= 2) { rebasePinch(); return; }
+  pinch = null;
+  if (PTRS.size === 1) {
+    const p = PTRS.values().next().value;
+    gDrag = { x: p.x, y: p.y, t: performance.now() };   // hand back without a jump
+    gMoved = 999; gVel.length = 0;
+    return;
+  }
+  endGlobeDrag(e);
+});
+gcv.addEventListener('pointercancel', e => {
+  PTRS.delete(e.pointerId);
+  if (PTRS.size < 2) pinch = null;
+  if (!PTRS.size) { gDrag = null; gcv.classList.remove('dragging'); }
+});
 
 gcv.addEventListener('wheel', e => {
   e.preventDefault();
-  ZOOMF = Math.max(0.45, Math.min(3.2, ZOOMF * (e.deltaY > 0 ? 0.92 : 1.087)));
-  resizeGlobe(); needGlobe = true; paintOnInput();
+  setZoom(ZOOMF * (e.deltaY > 0 ? 0.92 : 1.087));
+  paintOnInput();
 }, { passive: false });
 
 gcv.addEventListener('keydown', e => {
@@ -2484,8 +2878,8 @@ gcv.addEventListener('keydown', e => {
   else if (e.key === 'ArrowRight') { S.rot.lam += step; needGlobe = true; }
   else if (e.key === 'ArrowUp') { S.rot.phi = Math.min(89, S.rot.phi + step); needGlobe = true; }
   else if (e.key === 'ArrowDown') { S.rot.phi = Math.max(-89, S.rot.phi - step); needGlobe = true; }
-  else if (e.key === '+' || e.key === '=') { ZOOMF = Math.min(3.2, ZOOMF * 1.12); resizeGlobe(); needGlobe = true; }
-  else if (e.key === '-') { ZOOMF = Math.max(0.45, ZOOMF * 0.89); resizeGlobe(); needGlobe = true; }
+  else if (e.key === '+' || e.key === '=') setZoom(ZOOMF * 1.12);
+  else if (e.key === '-') setZoom(ZOOMF * 0.89);
   else if (e.key === 'Escape') setSelection(null);
   else return;
   paintOnInput();
@@ -2855,6 +3249,7 @@ function paintOnInput() {
   LAST_INPUT_AT = performance.now();
   lastInteraction = LAST_INPUT_AT;
   scheduleSharpen();
+  writeHash();                    // debounced; the URL settles when the gesture does
   if (painting || rafIsLive()) return;
   painting = true;
   try { renderNow(); } finally { painting = false; }
@@ -2934,9 +3329,9 @@ document.addEventListener('visibilitychange', () => {
 /* ------------------------------------------------------------------- start */
 function boot() {
   readPalette();
-  document.getElementById('stage').classList.toggle('space', S.basemap === 'satellite');
+  readHash();                     // a shared view wins over the defaults...
+  syncControls();                 // ...and the controls have to say so
   resizeGlobe(); resizeChron(); resizeKrail();
-  document.getElementById('resnote').textContent = RESOLVER_NOTE.consensus;
   /* readPalette() keys subjects as CSSV.geology, not CSSV['sub-geology']. Reading
      the wrong key passed undefined into withAlpha, which threw — and because
      this sits before requestAnimationFrame(frame), that silent TypeError meant
@@ -2958,12 +3353,21 @@ function boot() {
   renderNow();                    // paint once without waiting for rAF
   requestAnimationFrame(frame);   // then run the animation loop if it is available
   startHeartbeat();               // ...and a worker clock for when it is not
+  window.__BOOT_OK = true;
 }
 
-/* If boot ever throws again, the loop still starts. */
+/* If boot ever throws again, the loop still starts.
+
+   The flags are not debug scaffolding, they are the contract tools/smoke_test.py
+   checks. A boot that dies silently is this project's signature failure — it cost
+   the whole first build — and "the page looks fine in a screenshot" does not
+   detect it. Something has to be able to ask, from outside, whether boot ran. */
 function safeBoot() {
+  window.__BOOT_OK = false;
+  window.__BOOT_ERR = null;
   try { boot(); }
   catch (err) {
+    window.__BOOT_ERR = String((err && err.stack) || err);
     console.error('boot failed; starting the render loop anyway', err);
     try { markAll(); renderNow(); } catch (_) {}
     requestAnimationFrame(frame);

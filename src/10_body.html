@@ -10,6 +10,15 @@
 
     <div class="controls">
       <div class="group">
+        <label class="lbl" for="search">Find</label>
+        <input class="search" id="search" type="search" autocomplete="off" spellcheck="false"
+               placeholder="a fact, a place, a paper&hellip;"
+               role="combobox" aria-expanded="false" aria-controls="results" aria-autocomplete="list" />
+        <ul class="results" id="results" role="listbox" aria-label="Search results"></ul>
+        <p class="search-note" id="search-note"></p>
+      </div>
+
+      <div class="group">
         <span class="lbl" id="lbl-res">When claims disagree</span>
         <div class="seg" role="group" aria-labelledby="lbl-res" id="resolver">
           <button data-mode="consensus" aria-pressed="true">Best supported</button>
