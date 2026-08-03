@@ -4,13 +4,17 @@ A spatiotemporal knowledge graph with two clocks at right angles.
 
 **Earth-time** runs along the bottom: when things happened, 4.54 Ga to now, on a
 log axis with a real stratigraphic ribbon under it. **Knowledge-time** runs up
-the right-hand edge: when we came to believe them, 1650 to 2025. Both scrub
+the right-hand edge: when we came to believe them, 1650 to 2026. Both scrub
 independently. Moving knowledge-time rewires the causal graph — links appear
 when they were first proposed, harden when they reached consensus, and grey out
 when superseded.
 
 Open `earth-x-time.html` in a browser. No server, no network, no build step to
-run it.
+run it. 275 claims about 57 referents, wired by 52 edges.
+
+Every view has a URL. The two clocks, the rotation, the zoom, the resolver mode,
+the filter and the selection all live in `location.hash`, so
+`#k=1975&s=kpg_extinction` is a link rather than a set of instructions.
 
 ## Try these
 
@@ -57,6 +61,12 @@ Position comes from the claim that *won the date*, including when it says
 "global" — otherwise attaching Hutton's 1788 claim to the formation of the Earth
 renders the planet's origin as a dot at Siccar Point.
 
+Search reads the claims, not just the labels: "iridium", "Alvarez" and "clumped
+isotopes" are how anyone who knows this material looks for it, and none of them
+appear in a referent's name. A result row shows its date **as resolved at the
+current knowledge-time**, so a search can answer "we did not know that yet";
+choosing such a row moves knowledge-time to the year the claim was made.
+
 ## Building
 
 `src/` is concatenated in filename order and the bulky assets are injected:
@@ -66,7 +76,8 @@ python tools/build.py
 ```
 
 Writes `earth-x-time.html` (standalone) and `artifact.html` (body-only, for a
-host that supplies its own `<head>`). ~415 KB, entirely self-contained.
+host that supplies its own `<head>`). ~720 KB, entirely self-contained, and the
+build refuses to finish if the smoke test fails.
 
 | Asset | Source | Generator |
 |---|---|---|
@@ -110,6 +121,26 @@ the proposed → contested → consensus arc has to be authored.
 
 ## Validation
 
+Two gates, and neither is optional.
+
+`tools/smoke_test.py` loads the built page in headless Chromium over a local
+server and asks it, from outside, whether it works: did `boot()` report
+finishing, is `requestAnimationFrame` actually ticking *and driving* (rather
+than the worker heartbeat quietly covering for a loop that never started), is
+the element under the middle of the stage really the canvas, does dragging
+rotate the globe, does a pinch zoom it, does a cancelled pinch strand the
+gesture, does the K–Pg link still appear in 1980 and harden in 1991, does a
+shared URL restore the view, can a hostile hash poison it. 41 checks, wired into
+`build.py`, exits non-zero.
+
+It exists because this project lost an entire build to a boot failure that
+nothing detected: a legend swatch read the wrong palette key, `undefined` reached
+`withAlpha`, and the `TypeError` landed three lines above
+`requestAnimationFrame(frame)`, so the loop was never started. Every check up to
+that point called the draw functions directly and read back canvas pixels, which
+passes perfectly against a page that displays nothing. Each assertion in the file
+has been verified to fail against a deliberately reintroduced bug.
+
 `tools/validate_graph.py` is a gate, not a formatter. It checks referential
 integrity, schema discipline and coordinate sanity, and it asserts the product's
 own promises: that the required cross-domain causal chain is wired end to end,
@@ -119,18 +150,26 @@ and live by 1985. It exits non-zero on any of those.
 
 ## Known gaps
 
-- **Citations are not independently verified.** The adversarial fact-checking
-  pass that was supposed to confirm every author/year/venue against the
-  literature did not complete. Authors were instructed to search before writing
-  and to prefer an honest vague attribution over a fabricated precise one, and
-  the ten claims in `src/foundations.json` are hand-written from canonical works.
-  But treat the citations as plausible rather than checked.
+- **Citations are verified for the 2026 additions, and plausible-but-unchecked
+  for the rest.** The 37 claims added when the causal graph was wired went
+  through an adversarial pass that searched for every author, year, venue and
+  DOI: 35 proposed items were dropped, including one citation that does not
+  exist and four papers that do not say what they were quoted as saying. The
+  earlier 238 did not get that treatment. The authors were told to search before
+  writing and to prefer an honest vague attribution to a fabricated precise one,
+  and the ten claims in `src/foundations.json` are hand-written from canonical
+  works — but treat those as plausible rather than checked.
 - **Deep-time coordinates are modern coordinates.** Every claim carries
   `coords_are_modern: true` and the detail panel says so. Chicxulub is drawn
   where the Yucatán is now. Plate reconstruction is not implemented; the flag
   exists so it can be added without a migration.
-- **175 claims, not the 50–70 specified.** The generated clusters over-produced.
-  The extra depth is additive, but it is more than was asked for.
+- **275 claims, not the 50–70 specified.** The generated clusters over-produced,
+  and a later pass wiring the causal graph added more. The extra depth is
+  additive, but it is far more than was asked for.
+- **Eight causal claims still carry no edge.** Each was examined and dropped for
+  a stated reason — the cited paper does not assert the relation, or the correct
+  endpoint is a referent that does not exist yet. They render in the panel and
+  say nothing to the graph.
 - **Not React.** See below.
 
 ## Two deliberate departures
