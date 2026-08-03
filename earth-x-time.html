@@ -752,7 +752,9 @@ function readPalette() {
 function subjColor(subjects) { return CSSV[subjects[0]] || CSSV.chalk_dim || '#888'; }
 
 function withAlpha(hex, a) {
-  const h = hex.replace('#', '');
+  // Defensive: a missing palette key used to throw here, and the throw killed
+  // boot() before it ever started the animation loop.
+  const h = (hex || '').replace('#', '');
   if (h.length < 6) return hex;
   const n = parseInt(h.slice(0, 6), 16);
   return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`;
@@ -2851,6 +2853,7 @@ function scheduleSharpen() {
 }
 function paintOnInput() {
   LAST_INPUT_AT = performance.now();
+  lastInteraction = LAST_INPUT_AT;
   scheduleSharpen();
   if (painting || rafIsLive()) return;
   painting = true;
@@ -2860,6 +2863,65 @@ function paintOnInput() {
 /* If rAF has not painted recently and something is dirty, paint anyway. This is
    what makes the page work at all where rAF is paused; animation stops, but the
    globe, the ribbon and the panels are all there and still respond. */
+
+/* ------------------------------------------------------- the animation clock
+
+   Measured in a document whose visibilityState is "hidden":
+
+       requestAnimationFrame        0 Hz   (never fires)
+       main-thread setInterval(16)  1.3 Hz (clamped by intensive throttling)
+       Worker setInterval(16)      61.7 Hz (not throttled)
+
+   Input already paints itself, so dragging is smooth regardless. But anything
+   that animates on its own — the travelling dots along causal arcs, the pulse
+   on planet-wide facts, the inertia after a flick, Replay sweeping the
+   knowledge rail — has no clock at all, and ran at the watchdog's 1.3 Hz.
+
+   A dedicated worker's timer is exempt from that throttling, so one posts a
+   tick and the main thread renders on it. MessageChannel also escapes the
+   clamp, at 330,000 Hz, but that is a busy-spin rather than a clock.
+
+   The beat stands down the moment rAF starts working, so a normal foreground
+   tab is driven by rAF exactly as before, and it stops rendering after two
+   minutes without input so a genuinely backgrounded tab is not animated for
+   nobody. If the host's CSP forbids blob workers it degrades to what we had. */
+let beat = null;
+let lastInteraction = performance.now();
+const BEAT_IDLE_MS = 120000;
+
+function isAnimating() {
+  if (RM.matches) return false;
+  if (Math.abs(S.spin.lam) > 0.008 || Math.abs(S.spin.phi) > 0.008) return true;
+  if (S.playing || TW) return true;              // Replay, and the guided path
+  return facts().edges.length > 0;               // arcs animate continuously
+  return false;
+}
+
+function onBeat() {
+  if (rafIsLive()) return;                       // the real loop is back
+  if (performance.now() - lastInteraction > BEAT_IDLE_MS) return;
+  const dirty = needGlobe || needChron || needKrail || needPanel;
+  if (!dirty && !isAnimating()) return;
+  const now = performance.now();
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  if (isAnimating()) needGlobe = true;           // arcs and spin repaint the globe
+  try { render(dt); } catch (err) { console.error('render failed', err); }
+}
+
+function startHeartbeat() {
+  if (beat) return;
+  try {
+    const url = URL.createObjectURL(new Blob(
+      ['setInterval(function(){postMessage(0)},16);'], { type: 'text/javascript' }));
+    beat = new Worker(url);
+    URL.revokeObjectURL(url);
+    beat.onmessage = onBeat;
+  } catch (_) {
+    beat = null;                                  // CSP may forbid it; carry on
+  }
+}
+
 setInterval(() => {
   if (performance.now() - lastPaint > 400 &&
       (needGlobe || needChron || needKrail || needPanel)) renderNow();
@@ -2875,14 +2937,38 @@ function boot() {
   document.getElementById('stage').classList.toggle('space', S.basemap === 'satellite');
   resizeGlobe(); resizeChron(); resizeKrail();
   document.getElementById('resnote').textContent = RESOLVER_NOTE.consensus;
-  for (const [id, css] of [['lg-solid', `background:${CSSV['sub-geology']}`],
-                           ['lg-band', `background:${withAlpha(CSSV['sub-evolution'], .25)};border:1px solid ${CSSV['sub-evolution']}`],
-                           ['lg-arc', `background:linear-gradient(90deg, transparent, ${CSSV['sub-biology']})`]]) {
-    document.getElementById(id).style.cssText = css + ';height:9px';
+  /* readPalette() keys subjects as CSSV.geology, not CSSV['sub-geology']. Reading
+     the wrong key passed undefined into withAlpha, which threw — and because
+     this sits before requestAnimationFrame(frame), that silent TypeError meant
+     the animation loop was never started at all. Everything ran off the
+     throttled watchdog instead. Decoration must never be able to do that, so
+     the keys are right and the whole block is contained. */
+  try {
+    for (const [id, css] of [
+      ['lg-solid', `background:${CSSV.geology}`],
+      ['lg-band', `background:${withAlpha(CSSV.evolution, .25)};border:1px solid ${CSSV.evolution}`],
+      ['lg-arc', `background:linear-gradient(90deg, transparent, ${CSSV.biology})`]]) {
+      const el = document.getElementById(id);
+      if (el) el.style.cssText = css + ';height:9px';
+    }
+  } catch (err) {
+    console.error('legend swatches failed (non-fatal)', err);
   }
   changed();
   renderNow();                    // paint once without waiting for rAF
   requestAnimationFrame(frame);   // then run the animation loop if it is available
+  startHeartbeat();               // ...and a worker clock for when it is not
+}
+
+/* If boot ever throws again, the loop still starts. */
+function safeBoot() {
+  try { boot(); }
+  catch (err) {
+    console.error('boot failed; starting the render loop anyway', err);
+    try { markAll(); renderNow(); } catch (_) {}
+    requestAnimationFrame(frame);
+    startHeartbeat();
+  }
 }
 
 const ro = new ResizeObserver(() => {
@@ -2893,7 +2979,7 @@ ro.observe(document.querySelector('.chron'));
 ro.observe(document.querySelector('.krail'));
 
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => markAll());
-boot();
+safeBoot();
 
 </script>
 </body>

@@ -203,7 +203,9 @@ function readPalette() {
 function subjColor(subjects) { return CSSV[subjects[0]] || CSSV.chalk_dim || '#888'; }
 
 function withAlpha(hex, a) {
-  const h = hex.replace('#', '');
+  // Defensive: a missing palette key used to throw here, and the throw killed
+  // boot() before it ever started the animation loop.
+  const h = (hex || '').replace('#', '');
   if (h.length < 6) return hex;
   const n = parseInt(h.slice(0, 6), 16);
   return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`;
