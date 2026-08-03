@@ -22,7 +22,11 @@ const SEARCH_IDX = (() => {
       label: R.referents[id].label,
       low: R.referents[id].label.toLowerCase(),
       body: claims.map(c => `${c.statement} ${c.asserted_by}`).join(' ').toLowerCase(),
-      first: claims.reduce((m, c) => Math.min(m, c.knowledge_time), Infinity)
+      // The year resolve() can first place it, not the year anyone first said
+      // anything about it - those differ, and the label has to match what
+      // choosing the row will actually do.
+      first: claims.filter(c => !c._meta && isFinite(c.earth_time_start))
+        .reduce((m, c) => Math.min(m, c.knowledge_time), Infinity)
     });
   }
   return out;
@@ -48,7 +52,7 @@ function searchFacts(qs) {
 const elSearch = document.getElementById('search');
 const elResults = document.getElementById('results');
 const elSearchNote = document.getElementById('search-note');
-let SR = { hits: [], cursor: -1 };
+let SR = { hits: [], cursor: -1, q: '' };
 
 function hilite(label, s) {
   const i = label.toLowerCase().indexOf(s.toLowerCase());
@@ -76,21 +80,37 @@ function renderResults() {
 }
 
 function closeResults() {
-  SR = { hits: [], cursor: -1 };
+  // Cancel the pending debounce too. Without this, dismissing the dropdown and
+  // then doing nothing for 90 ms reopens it: the timer from the last keystroke
+  // is still queued and repopulates SR behind the user's back.
+  clearTimeout(searchTimer); searchTimer = null;
+  SR = { hits: [], cursor: -1, q: elSearch.value.trim() };
   elResults.innerHTML = '';
   elSearch.setAttribute('aria-expanded', 'false');
   elSearchNote.textContent = '';
 }
 
+/* Getting there is not enough: a result can be invisible because knowledge-time
+   is earlier than the claim, because its field of study is switched off, or
+   because another field is isolated. Choosing it opens whatever is in the way. */
 function chooseResult(id) {
-  if (!R.referents[id]) return;
+  if (!Object.prototype.hasOwnProperty.call(R.referents, id)) return;
   const claims = R.byRef[id] || [];
   let kt = S.kt;
-  const first = claims.reduce((m, c) => Math.min(m, c.knowledge_time), Infinity);
-  // Nothing to show at the current knowledge-time: move to the year it entered
-  // the record rather than selecting something that cannot be drawn.
+  /* Only claims that resolve() will actually count. Taking the minimum over ALL
+     claims picks up undated and _meta ones, so a referent whose earliest DATED
+     claim is 1953 but which carries a 1785 interpretation reported "first
+     claimed 1785" and then selected into an empty panel, because resolve()
+     returns null when nothing dated is live. Mirror its predicate exactly. */
+  const dated = claims.filter(c => !c._meta && isFinite(c.earth_time_start));
+  const first = dated.reduce((m, c) => Math.min(m, c.knowledge_time), Infinity);
   if (isFinite(first) && first > kt) kt = Math.min(KT_MAX, first);
+
   const res = resolve(id, kt, S.resolver);
+  if (res) {
+    if (S.focus && !res.subjects.includes(S.focus)) S.focus = null;
+    if (!res.subjects.some(s => S.subjects.has(s))) for (const s of res.subjects) S.subjects.add(s);
+  }
   const t1 = res && isFinite(res.oldest)
     ? Math.max(2000, Math.min(T_MAX, res.oldest * 1.7))
     : S.win.t1;
@@ -100,13 +120,24 @@ function chooseResult(id) {
 }
 
 let searchTimer = null;
+function runSearch() {
+  SR = { hits: searchFacts(elSearch.value), cursor: -1, q: elSearch.value.trim() };
+  renderResults();
+}
 elSearch.addEventListener('input', () => {
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => {
-    SR = { hits: searchFacts(elSearch.value), cursor: -1 };
-    renderResults();
-  }, 90);
+  searchTimer = setTimeout(runSearch, 90);
 });
+
+/* Typing "pomp" and hitting Enter within 90 ms of the last keystroke used to
+   select the top hit for "pom", because the debounced recompute had not run yet.
+   Stamp the query the hits belong to, and flush synchronously if Enter arrives
+   before the timer does. */
+function flushSearch() {
+  clearTimeout(searchTimer); searchTimer = null;
+  runSearch();
+}
+
 
 elSearch.addEventListener('keydown', e => {
   if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -120,6 +151,7 @@ elSearch.addEventListener('keydown', e => {
     if (el) el.scrollIntoView({ block: 'nearest' });
     e.preventDefault();
   } else if (e.key === 'Enter') {
+    if (SR.q !== elSearch.value.trim()) { flushSearch(); SR.cursor = -1; }
     const h = SR.hits[SR.cursor >= 0 ? SR.cursor : 0];
     if (h) chooseResult(h.id);
     e.preventDefault();

@@ -42,8 +42,12 @@ function writeHash(now) {
   clearTimeout(hashTimer);
   const put = () => {
     const h = encodeHash();
-    if (h === location.hash) return;
+    // hashSelf is recorded even when the URL already says this, because it is a
+    // record of "the view we last knew the bar to be showing", not of what we
+    // wrote. Setting it only after a successful write left it holding an older
+    // hash, and the hashchange guard then ignored the Back that returned to it.
     hashSelf = h;
+    if (h === location.hash) return;
     try { history.replaceState(null, '', h); } catch (_) { /* opaque origin; carry on */ }
   };
   // Dragging the globe changes the rotation sixty times a second. Debounced, so
@@ -53,8 +57,10 @@ function writeHash(now) {
 
 function readHash() {
   try {
+    // No early return on an empty hash: "" is a legitimate view - the default
+    // one - and navigating Back to a bare URL has to restore it rather than
+    // leave whatever the previous entry had on screen.
     const raw = (location.hash || '').replace(/^#/, '');
-    if (!raw) return false;
     const p = {};
     for (const kv of raw.split('&')) {
       const i = kv.indexOf('=');
@@ -64,30 +70,41 @@ function readHash() {
       const n = parseFloat(v);
       return isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d;
     };
+    /* `R.referents[id]` is truthy for "constructor", "toString" and every other
+       name on Object.prototype, so a hash of #s=constructor passed validation
+       and put a function into S.selection, which then threw in the render loop
+       on every frame. Membership has to be an own-property test. */
+    const own = (o, k) => typeof k === 'string' && Object.prototype.hasOwnProperty.call(o, k);
 
-    S.kt = Math.round(num(p.k, KT_MIN, KT_MAX, S.kt));
+    /* Every field is SET, not patched. readHash used to leave a field alone when
+       its key was absent, which is correct for a first load - the defaults are
+       already in place - and wrong for every later one: pressing Back from a
+       view with a selection to one without left the selection on screen, and the
+       debounced writeHash then put it back into the URL, so the history entry
+       silently rewrote itself and Forward went somewhere new. */
+    S.kt = Math.round(num(p.k, KT_MIN, KT_MAX, KT_MAX));
 
+    let t0 = 0, t1 = T_MAX;
     if (p.t) {
       const [a, b] = p.t.split('_');
-      const t0 = num(a, 0, T_MAX, S.win.t0), t1 = num(b, 0, T_MAX, S.win.t1);
-      if (t1 - t0 >= 50) { S.win.t0 = t0; S.win.t1 = t1; }
+      const u0 = num(a, 0, T_MAX, 0), u1 = num(b, 0, T_MAX, T_MAX);
+      if (u1 - u0 >= 50) { t0 = u0; t1 = u1; }
     }
-    if (p.r) {
-      const [a, b] = p.r.split(',');
-      S.rot.lam = num(a, -100000, 100000, S.rot.lam);
-      S.rot.phi = num(b, -89, 89, S.rot.phi);
-    }
-    if (p.z) ZOOMF = num(p.z, ZMIN, ZMAX, ZOOMF);
-    if (p.m && ['consensus', 'frontier', 'spread'].includes(p.m)) S.resolver = p.m;
-    if (p.s && R.referents[p.s]) S.selection = p.s;
-    if (p.f && SUBJECTS.includes(p.f)) S.focus = p.f;
-    if (p.x) {
-      const off = new Set(p.x.split('.').filter(s => SUBJECTS.includes(s)));
-      // Turning every subject off would show an empty globe and look broken.
-      if (off.size < SUBJECTS.length) S.subjects = new Set(SUBJECTS.filter(s => !off.has(s)));
-    }
-    if (p.b === 'chart' || p.b === 'satellite') S.basemap = p.b;
-    if (p.p === '0') S.showPlates = false;
+    S.win.t0 = t0; S.win.t1 = t1;
+
+    const [ra, rb] = (p.r || '').split(',');
+    S.rot.lam = num(ra, -100000, 100000, 30);
+    S.rot.phi = num(rb, -89, 89, 12);
+    ZOOMF = num(p.z, ZMIN, ZMAX, 0.86);
+    S.resolver = ['consensus', 'frontier', 'spread'].includes(p.m) ? p.m : 'consensus';
+    S.selection = own(R.referents, p.s) ? p.s : null;
+    S.focus = SUBJECTS.includes(p.f) ? p.f : null;
+    const off = new Set((p.x || '').split('.').filter(s => SUBJECTS.includes(s)));
+    // Turning every subject off would show an empty globe and read as broken.
+    S.subjects = new Set(off.size && off.size < SUBJECTS.length
+      ? SUBJECTS.filter(s => !off.has(s)) : SUBJECTS);
+    S.basemap = p.b === 'chart' ? 'chart' : 'satellite';
+    S.showPlates = p.p !== '0';
     return true;
   } catch (err) {
     console.warn('unreadable view in the URL; using defaults', err);
@@ -117,9 +134,9 @@ function syncControls() {
 /* Back, forward, and someone pasting a different view into the same tab. */
 window.addEventListener('hashchange', () => {
   if (location.hash === hashSelf) return;
-  if (!readHash()) return;
+  hashSelf = '';                  // consumed; a later Back to this view must not be ignored
+  readHash();                     // false only means "no hash", which is a real view too
   syncControls();
-  resizeGlobe();
-  SURF.key = '';
+  applyZoom();
   changed();
 });

@@ -244,6 +244,22 @@ def run(url, headed, report):
                      page.evaluate("S.selection") is None,
                      f"selection={page.evaluate('S.selection')!r}")
 
+        # A cancelled pinch must not strand the gesture. Android cancels a
+        # stationary finger when long-press takes over; iOS cancels one on palm
+        # rejection. pointercancel used to null the pinch and stop, leaving the
+        # surviving finger with no drag origin and the grabbing cursor stuck on.
+        touch("touchStart", [(cx - 60, cy), (cx + 60, cy)])
+        touch("touchMove", [(cx - 120, cy), (cx + 120, cy)])
+        page.wait_for_timeout(20)
+        touch("touchCancel", [])
+        page.wait_for_timeout(80)
+        report.check("a cancelled pinch leaves no stranded state",
+                     page.evaluate("PTRS.size === 0 && pinch === null && gDrag === null"),
+                     f"PTRS.size={page.evaluate('PTRS.size')} "
+                     f"gDrag={page.evaluate('gDrag !== null')}")
+        report.check("a cancelled pinch releases the grabbing cursor",
+                     not page.evaluate("document.getElementById('globe').classList.contains('dragging')"))
+
         # --------------------------------------------------------------- search
         page.fill("#search", "iridium")
         page.wait_for_timeout(250)
@@ -337,6 +353,22 @@ def run(url, headed, report):
                          json.dumps(back))
             report.check("no errors after restoring from a URL", not page_errors,
                          " | ".join(page_errors[:2]))
+
+
+        # Object.prototype keys are truthy in a plain-object map, so a hash of
+        # #s=constructor once put a function into S.selection and threw in the
+        # render loop on every frame.
+        page.goto("about:blank")
+        page.goto(url.split("#")[0] + "#s=constructor&m=toString&f=hasOwnProperty&x=valueOf",
+                  wait_until="load", timeout=45000)
+        page.wait_for_timeout(900)
+        report.check("a hostile hash cannot poison the view",
+                     page.evaluate("S.selection") is None
+                     and page.evaluate("S.resolver") == "consensus"
+                     and page.evaluate("S.focus") is None
+                     and page.evaluate("window.__BOOT_OK") is True,
+                     f"selection={page.evaluate('S.selection')!r} resolver={page.evaluate('S.resolver')!r}")
+        report.check("a hostile hash raises no errors", not page_errors, " | ".join(page_errors[:2]))
 
         browser.close()
 

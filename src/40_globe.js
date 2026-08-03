@@ -188,6 +188,14 @@ function resizeGlobe() {
   gcv.width = Math.round(GW * DPR); gcv.height = Math.round(GH * DPR);
   gx.setTransform(DPR, 0, 0, DPR, 0, 0);
   GCX = GW / 2; GCY = GH / 2;
+  applyZoom();
+}
+
+/* Zoom alone. Assigning gcv.width reallocates and blanks the bitmap and resets
+   the whole 2D context state, which is the right thing to do when the element
+   changes size and pure waste sixty times a second during a pinch, where only
+   the radius moves. Splitting it out means a pinch touches two numbers. */
+function applyZoom() {
   GR = Math.min(GW, GH) * 0.5 * ZOOMF;
   SURF.key = '';                       // the cached sphere is the wrong size now
 }

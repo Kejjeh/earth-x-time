@@ -9,9 +9,19 @@ const PLATE_ENC  = '/*@PLATES@*/';
 const ICS        = /*@ICS@*/;
 const GRAPH      = /*@GRAPH@*/;
 
-const PRESENT = 2025;          // ybp is measured from here
+/* The epoch every earth_time_* value in graph.json was authored against. NOT the
+   same quantity as KT_MAX below, however much they looked like the same number:
+   these are stored years-before-present, so moving this moves every historical
+   date in the dataset. Hastings is stored as 959 and reads 1066 from here; bump
+   PRESENT and it reads 1067. Only change it alongside a migration of the data. */
+const PRESENT = 2025;
 const T_MAX   = 4.6e9;         // oldest point on the axis
-const KT_MIN  = 1650, KT_MAX = 2025;
+/* The upper end of knowledge-time is NOW, not a constant someone typed once.
+   A 2026 paper - Snelling et al., Nature 653:439-443 - overturns the oxygen
+   explanation for giant Palaeozoic insects, and with the rail stopping at 2025
+   its status entry could never fire: the graph would have shown a consensus the
+   literature had already abandoned. Move this when the record moves past it. */
+const KT_MIN  = 1650, KT_MAX = 2026;
 
 const RM = matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -215,7 +225,7 @@ function withAlpha(hex, a) {
 const S = {
   win: { t0: 0, t1: T_MAX },
   cursor: 66043000,
-  kt: 2025,
+  kt: KT_MAX,
   ktA: 1975,
   subjects: new Set(SUBJECTS),
   focus: null,

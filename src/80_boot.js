@@ -32,7 +32,7 @@ const ZMIN = 0.45, ZMAX = 3.2;
 function setZoom(z) {
   const n = Math.max(ZMIN, Math.min(ZMAX, z));
   if (n === ZOOMF) return false;
-  ZOOMF = n; resizeGlobe(); needGlobe = true;
+  ZOOMF = n; applyZoom(); needGlobe = true;
   return true;
 }
 
@@ -70,6 +70,7 @@ gcv.addEventListener('pointerdown', e => {
   if (e.isPrimary) { PTRS.clear(); pinch = null; }
   PTRS.set(e.pointerId, { x: e.clientX, y: e.clientY });
   S.spin.lam = S.spin.phi = 0;
+  TW = null;                 // a hand on the globe outranks a fly-to in progress
   gVel.length = 0;
   gcv.classList.add('dragging');
   if (PTRS.size >= 2) {
@@ -134,9 +135,9 @@ gcv.addEventListener('pointermove', e => {
 });
 
 function endGlobeDrag(e) {
+  gcv.classList.remove('dragging');   // before the guard: a cancelled pinch has no gDrag
   if (!gDrag) return;
   gDrag = null;
-  gcv.classList.remove('dragging');
   if (!RM.matches && gVel.length) {
     const now = performance.now();
     const recent = gVel.filter(v => now - v.t < 90);
@@ -158,23 +159,35 @@ function endGlobeDrag(e) {
   }
 }
 /* Lifting a finger mid-pinch must not end the gesture, and must not be read as a
-   click. Only the last one up is a real pointerup. */
-gcv.addEventListener('pointerup', e => {
+   click. Only the last one up is a real pointerup.
+
+   pointercancel has to do exactly the same bookkeeping, which it did not: it
+   nulled the pinch and stopped. Two ways that bites, both reachable on a real
+   phone - Android cancels a stationary finger when the long-press gesture takes
+   over, iOS cancels one on palm rejection. Three fingers down and the first is
+   cancelled: the baseline still describes a pair that no longer exists, so the
+   next move divides by the wrong distance and the globe snaps to minimum zoom
+   and jumps a hundred degrees of longitude in one frame. Two fingers down and
+   one is cancelled: the survivor never gets a drag origin back, so it stops
+   rotating the globe and starts hovering tooltips instead, and the grabbing
+   cursor is still stuck on when everything is finally lifted. */
+function releasePointer(e) {
   PTRS.delete(e.pointerId);
-  if (PTRS.size >= 2) { rebasePinch(); return; }
+  if (PTRS.size >= 2) { rebasePinch(); return true; }
   pinch = null;
   if (PTRS.size === 1) {
     const p = PTRS.values().next().value;
     gDrag = { x: p.x, y: p.y, t: performance.now() };   // hand back without a jump
     gMoved = 999; gVel.length = 0;
-    return;
+    return true;
   }
-  endGlobeDrag(e);
-});
+  return false;
+}
+gcv.addEventListener('pointerup', e => { if (!releasePointer(e)) endGlobeDrag(e); });
 gcv.addEventListener('pointercancel', e => {
-  PTRS.delete(e.pointerId);
-  if (PTRS.size < 2) pinch = null;
-  if (!PTRS.size) { gDrag = null; gcv.classList.remove('dragging'); }
+  if (releasePointer(e)) return;
+  gDrag = null; gVel.length = 0;
+  gcv.classList.remove('dragging');
 });
 
 gcv.addEventListener('wheel', e => {
@@ -358,7 +371,7 @@ document.getElementById('btn-plates').addEventListener('click', e => {
   e.currentTarget.setAttribute('aria-pressed', String(S.showPlates));
   needGlobe = true;
 });
-document.getElementById('btn-now').addEventListener('click', () => { stopReplay(); setKt(2025); });
+document.getElementById('btn-now').addEventListener('click', () => { stopReplay(); setKt(KT_MAX); });
 document.getElementById('btn-play').addEventListener('click', () => S.playing ? stopReplay() : startReplay());
 
 document.getElementById('btn-theme').addEventListener('click', () => {
@@ -381,7 +394,7 @@ document.getElementById('diff-close').addEventListener('click', () => {
   document.getElementById('btn-diff').setAttribute('aria-pressed', 'false');
 });
 document.getElementById('diff-a').addEventListener('input', e => { S.ktA = +e.target.value || 1975; renderDiff(); });
-document.getElementById('diff-b').addEventListener('input', e => { setKt(+e.target.value || 2025); renderDiff(); });
+document.getElementById('diff-b').addEventListener('input', e => { setKt(+e.target.value || KT_MAX); renderDiff(); });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !diffwrap.hidden) {
     diffwrap.hidden = true;
@@ -395,13 +408,13 @@ const TOUR = [
     text: 'A ten-kilometre asteroid hits the Yucatán platform. One point on the map, and the reach of it is carried by the arcs, not by the size of the dot.' },
   { id: 'kpg_extinction', kt: 1995, win: [0, 2.0e8],
     text: 'Three-quarters of species end here. Drag the right-hand rail back to 1975 and the link you are looking at does not exist yet.' },
-  { id: 'mammal_radiation', kt: 2025, win: [0, 1.0e8],
+  { id: 'mammal_radiation', kt: KT_MAX, win: [0, 1.0e8],
     text: 'With the large-bodied niches empty, mammals radiate. The chain has just crossed from geology into biology.' },
-  { id: 'first_primates', kt: 2025, win: [0, 8.0e7],
+  { id: 'first_primates', kt: KT_MAX, win: [0, 8.0e7],
     text: 'Primates appear in the aftermath. Isolate evolution in the left-hand panel and this link still shows, because the graph is one graph.' },
-  { id: 'hominins', kt: 2025, win: [0, 1.2e7],
+  { id: 'hominins', kt: KT_MAX, win: [0, 1.2e7],
     text: 'The hominin line separates from the chimpanzee line. Molecular clocks and fossils disagree about when, so this draws as a band.' },
-  { id: 'homo_sapiens', kt: 2025, win: [0, 1.0e6],
+  { id: 'homo_sapiens', kt: KT_MAX, win: [0, 1.0e6],
     text: 'Us. In 2016 this sat near 200,000 years; Jebel Irhoud moved it to about 315,000. Switch the resolver to Newest and watch it jump.' }
 ];
 let TW = null;

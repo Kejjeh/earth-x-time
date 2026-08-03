@@ -12,6 +12,11 @@ import json, sys, os, html, math, collections
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
+# Mirrors KT_MIN/KT_MAX in src/20_core.js. The ceiling is "now", not a
+# constant: the record keeps moving, and a claim the rail cannot reach is a
+# claim whose status entry can never fire.
+KT_MIN, KT_MAX = 1650, 2026
+
 SUBJECTS = {"geology", "biology", "evolution", "chemistry", "human_history", "astronomy"}
 STATUSES = {"proposed", "contested", "consensus", "superseded"}
 CTYPES = {"existence", "dating", "location", "causal", "interpretation"}
@@ -132,7 +137,12 @@ def on_land(lat, lng, rings):
 
 
 def main():
-    src = sys.argv[1]
+    # Defaults to the live graph. It used to require a path because it was
+    # written to check generated clusters before they were merged; running it on
+    # the merged graph is now the common case, and the foundations merge below
+    # has to notice they are already there.
+    args = [a for a in sys.argv[1:] if not a.startswith("-")]
+    src = args[0] if args else os.path.join(ROOT, "src", "graph.json")
     obj = deep_clean(load(src))
     g = obj["graph"] if "graph" in obj else obj
 
@@ -140,9 +150,11 @@ def main():
     fpath = os.path.join(ROOT, "src", "foundations.json")
     if os.path.exists(fpath):
         f = json.load(open(fpath, encoding="utf-8"))
-        g["referents"] += f.get("referents", [])
-        g["claims"] += f.get("claims", [])
-        g["edges"] += f.get("edges", [])
+        have = {c["id"] for c in g["claims"]}
+        if not (f.get("claims") and f["claims"][0]["id"] in have):
+            g["referents"] += f.get("referents", [])
+            g["claims"] += f.get("claims", [])
+            g["edges"] += f.get("edges", [])
         print(f"merged foundations.json: +{len(f.get('claims', []))} claims")
 
     refs, claims, edges = g["referents"], g["claims"], g["edges"]
@@ -185,8 +197,8 @@ def main():
         if len(set(c["subjects"])) < 2:
             errors.append(f"{w}: needs >=2 distinct subjects, has {c['subjects']}")
         c["subjects"] = list(dict.fromkeys(c["subjects"]))
-        if not (1650 <= c["knowledge_time"] <= 2025):
-            errors.append(f"{w}: knowledge_time {c['knowledge_time']} out of [1650,2025]")
+        if not (KT_MIN <= c["knowledge_time"] <= KT_MAX):
+            errors.append(f"{w}: knowledge_time {c['knowledge_time']} out of [{KT_MIN},{KT_MAX}]")
         if c["earth_time_end"] > c["earth_time_start"]:
             errors.append(f"{w}: earth_time_end older than start "
                           f"({c['earth_time_end']} > {c['earth_time_start']})")
@@ -203,7 +215,7 @@ def main():
         for e in c["status_timeline"]:
             if e["status"] not in STATUSES:
                 errors.append(f"{w}: bad status {e['status']}")
-            if not (1650 <= e["knowledge_time"] <= 2025):
+            if not (KT_MIN <= e["knowledge_time"] <= KT_MAX):
                 errors.append(f"{w}: timeline kt {e['knowledge_time']} out of range")
         first = c["status_timeline"][0]["knowledge_time"]
         if first != c["knowledge_time"]:
@@ -307,8 +319,8 @@ def main():
     movers = []
     for r, cs in by_ref.items():
         dating = [c for c in cs if c["type"] == "dating"] or cs
-        a = resolve(dating, 2025, "consensus")
-        b = resolve(dating, 2025, "frontier")
+        a = resolve(dating, KT_MAX, "consensus")
+        b = resolve(dating, KT_MAX, "frontier")
         if a and b and a["id"] != b["id"] and a["earth_time_start"] != b["earth_time_start"]:
             movers.append((r, a["earth_time_start"], b["earth_time_start"]))
     if not movers:
@@ -325,7 +337,7 @@ def main():
                 out.add((e["source"], e["target"]))
         return out
 
-    l1975, l1985, l1995, l2025 = (live_causal(y) for y in (1975, 1985, 1995, 2025))
+    l1975, l1985, l1995, l2025 = (live_causal(y) for y in (1975, 1985, 1995, KT_MAX))
     if ("chicxulub_impact", "kpg_extinction") in l1975:
         errors.append("Chicxulub->K-Pg is already live in 1975 — the rewiring demo is broken")
     if ("chicxulub_impact", "kpg_extinction") not in l1985:

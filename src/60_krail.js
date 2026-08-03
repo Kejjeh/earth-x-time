@@ -70,7 +70,7 @@ function drawKrail() {
 
   // ticks
   kx.font = '400 9px xt-mono, monospace';
-  for (let yr = 1650; yr <= 2025; yr += 50) {
+  for (let yr = 1650; yr <= KT_MAX; yr += 50) {
     const py = ktToY(yr);
     kx.strokeStyle = withAlpha(CSSV['chalk-faint'], 0.45);
     kx.beginPath(); kx.moveTo(spine + 0.5, py); kx.lineTo(spine + 5, py); kx.stroke();
