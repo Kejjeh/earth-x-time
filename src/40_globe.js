@@ -79,8 +79,21 @@ function paintSatelliteCached(scale) {
   return true;
 }
 
+/* Adaptive resolution: choose the scale from what a paint actually cost on
+   this machine rather than from a constant guessed on one laptop. Quantised so
+   the surface cache is not thrashed by a scale that drifts every frame. */
+let satFullMs = 16;
+const SAT_BUDGET_MS = 4.5;
+const SAT_STEPS = [0.34, 0.45, 0.6, 0.8, 1];
+function movingScale() {
+  const want = Math.sqrt(SAT_BUDGET_MS / Math.max(0.5, satFullMs));
+  for (const st of SAT_STEPS) if (st >= want) return st;
+  return 1;
+}
+
 function paintSatellite(scale) {
   if (!TEX.ready) return false;
+  const _t0 = performance.now();
   if (RAY.scale !== scale || RAY.w !== Math.round(GW * scale)) buildRays(scale);
   const { nz, nx, ny, idx, buf, count } = RAY;
   const tw = TEX.w, th = TEX.h, td = TEX.data;
@@ -116,6 +129,7 @@ function paintSatellite(scale) {
     SURF.canvas.width = RAY.w; SURF.canvas.height = RAY.h;
   }
   SURF.ctx.putImageData(RAY.img, 0, 0);
+  satFullMs = satFullMs * 0.75 + ((performance.now() - _t0) / (scale * scale)) * 0.25;
   return true;
 }
 
@@ -473,7 +487,8 @@ function drawLabel(sx, sy, text, color, boxes, strong) {
 
 /* ------------------------------------------------------------------- render */
 let arcPhase = 0;
-let ON_IMAGERY = false;   // label scrims darken over satellite imagery
+let ON_IMAGERY = false;
+let LAST_INPUT_AT = -1e9;   // set by paintOnInput; holds the globe coarse mid-gesture   // label scrims darken over satellite imagery
 
 function drawGlobe(dt) {
   const F = facts();
@@ -481,13 +496,14 @@ function drawGlobe(dt) {
   HIT.length = 0;
   gx.clearRect(0, 0, GW, GH);
 
-  const moving = !!gDrag || Math.abs(S.spin.lam) > 0.01 || Math.abs(S.spin.phi) > 0.01 || !!TW;
+  const moving = !!gDrag || Math.abs(S.spin.lam) > 0.01 || Math.abs(S.spin.phi) > 0.01 || !!TW
+    || (performance.now() - LAST_INPUT_AT) < 170;
   const satellite = S.basemap === 'satellite' && TEX.ready;
   ON_IMAGERY = satellite;
 
   if (satellite) {
     paintAtmosphere();
-    paintSatelliteCached(moving ? 0.5 : 1);
+    paintSatelliteCached(moving ? movingScale() : 1);
   } else {
     const grd = gx.createRadialGradient(GCX - GR * 0.3, GCY - GR * 0.35, GR * 0.1, GCX, GCY, GR);
     grd.addColorStop(0, CSSV['ocean-hi']); grd.addColorStop(1, CSSV['ocean-lo']);

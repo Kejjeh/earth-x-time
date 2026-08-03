@@ -27,7 +27,7 @@ let gDrag = null, gMoved = 0;
 const gVel = [];
 
 gcv.addEventListener('pointerdown', e => {
-  gcv.setPointerCapture(e.pointerId);
+  try { gcv.setPointerCapture(e.pointerId); } catch (_) { /* drag works without capture */ }
   gDrag = { x: e.clientX, y: e.clientY, t: performance.now() };
   gMoved = 0; gVel.length = 0;
   S.spin.lam = S.spin.phi = 0;
@@ -128,7 +128,7 @@ function chronPos(e) {
 }
 
 ccv.addEventListener('pointerdown', e => {
-  ccv.setPointerCapture(e.pointerId);
+  try { ccv.setPointerCapture(e.pointerId); } catch (_) {}
   const p = chronPos(e);
   const sc = SCALE || chronScale();
   const cursorX = sc.x(S.cursor);
@@ -218,7 +218,7 @@ function kSet(e) {
   const r = kcv.getBoundingClientRect();
   setKt(yToKt(e.clientY - r.top));
 }
-kcv.addEventListener('pointerdown', e => { kcv.setPointerCapture(e.pointerId); kDrag = true; stopReplay(); kSet(e); });
+kcv.addEventListener('pointerdown', e => { try { kcv.setPointerCapture(e.pointerId); } catch (_) {} kDrag = true; stopReplay(); kSet(e); });
 kcv.addEventListener('pointermove', e => { if (kDrag) kSet(e); });
 kcv.addEventListener('pointerup', () => { kDrag = false; });
 kcv.addEventListener('pointercancel', () => { kDrag = false; });
@@ -377,7 +377,7 @@ function ease(t) { return t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; 
  */
 let last = performance.now();
 let lastPaint = 0;
-let rafPending = false;
+let lastRafAt = -1e9;
 
 function render(dt) {
   lastPaint = performance.now();
@@ -430,11 +430,10 @@ function render(dt) {
 }
 
 function frame(now) {
-  rafPending = false;
+  lastRafAt = performance.now();
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   try { render(dt); } catch (err) { console.error('render failed', err); }
-  rafPending = true;
   requestAnimationFrame(frame);
 }
 
@@ -455,11 +454,34 @@ function renderNow() {
  * queue more paints than we can serve, and guarded against re-entry.
  */
 let painting = false;
-function rafIsLive() { return performance.now() - lastPaint < 250 && rafPending; }
+/* Has the animation loop actually run lately?
 
+   The old test asked whether a frame had been *requested*, which stays true
+   forever after the first one: rAF stops firing but the flag never clears,
+   while lastPaint keeps being refreshed by the watchdog. So the guard read
+   "rAF is alive" permanently and paintOnInput returned early on every input,
+   dropping the page back to the 250 ms watchdog - four frames a second. That
+   is the unresponsiveness. Ask when a frame last actually ran. */
+function rafIsLive() { return performance.now() - lastRafAt < 120; }
+
+/* Paint on every input event; no time throttle.
+
+   A throttle needs a trailing timer to make up skipped frames, and in a hidden
+   document - exactly the case that made painting from input necessary - chained
+   timers are clamped to about 1 Hz, so the make-up frame never arrives. There is
+   no need for one: a paint is ~1 ms on a cache hit, the adaptive scale keeps a
+   miss cheap, the re-entrancy guard stops overlap, and the event loop cannot
+   deliver the next move until this handler returns. Sharpening stays deferred,
+   because that frame is expensive and belongs after the gesture. */
+let sharpen = null;
+function scheduleSharpen() {
+  if (sharpen) clearTimeout(sharpen);
+  sharpen = setTimeout(() => { sharpen = null; needGlobe = true; renderNow(); }, 190);
+}
 function paintOnInput() {
+  LAST_INPUT_AT = performance.now();
+  scheduleSharpen();
   if (painting || rafIsLive()) return;
-  if (performance.now() - lastPaint < 11) return;
   painting = true;
   try { renderNow(); } finally { painting = false; }
 }
