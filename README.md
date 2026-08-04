@@ -24,7 +24,7 @@ the filter and the selection all live in `location.hash`, so
 | Drag to **1880** | The Earth becomes 98 million years old. Kelvin's cooling calculation is the best-supported claim in 1880, and the whole timeline collapses with it. Radioactivity breaks his ceiling in 1903. |
 | Scrub **1950 → 2025** with *Peopling of the Americas* selected | Clovis-first holds as consensus, then collapses: 13 ka → 14.6 ka (Monte Verde) → 15.5 ka → 16.6 ka. |
 | Select **The Origin of Life** | Draws as a band 1.1 billion years wide, not a point. Five rival datings, solid marker for the winner, hollow ones for the rest. |
-| Switch resolver to **Newest** | Ten referents move. Origin of life jumps from 3.43 Ga to 4.28 Ga. |
+| Switch resolver to **Newest** | 28 of the 57 referents move. Origin of life jumps from 3.43 Ga to 4.28 Ga. |
 | Double-click a **field of study** | Isolates it, and keeps the causal links that leave it. |
 
 ## Structure
@@ -171,6 +171,11 @@ and live by 1985. It exits non-zero on any of those.
   endpoint is a referent that does not exist yet. They render in the panel and
   say nothing to the graph.
 - **Not React.** See below.
+- **A UX review found twelve more, none of them implemented.** The worst is that
+  `Guided path` renders entirely off the left edge on a phone, which makes the tour
+  unreachable on every phone — it has no other entry point. See
+  [`docs/ux-review-2026-08-03.md`](docs/ux-review-2026-08-03.md), which covers this
+  site and its sibling together.
 
 ## Two deliberate departures
 
