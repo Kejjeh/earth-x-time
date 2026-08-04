@@ -1,0 +1,19 @@
+#!/bin/sh
+# Versioned hook. Lives in .githooks/ rather than .git/hooks/ so it is
+# reviewable in the diff and travels with a clone; a clone activates it once:
+#
+#     git config core.hooksPath .githooks
+#
+# Bypassing this with --no-verify is not a fix. If it fires, the path is real.
+set -e
+
+if command -v python >/dev/null 2>&1; then
+  PY=python
+elif command -v python3 >/dev/null 2>&1; then
+  PY=python3
+else
+  echo "pre-commit: no python on PATH; cannot check for local paths." >&2
+  exit 1
+fi
+
+exec "$PY" tools/check_no_local_paths.py --staged

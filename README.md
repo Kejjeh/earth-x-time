@@ -121,7 +121,7 @@ the proposed → contested → consensus arc has to be authored.
 
 ## Validation
 
-Two gates, and neither is optional.
+Three gates, and none of them is optional.
 
 `tools/smoke_test.py` loads the built page in headless Chromium over a local
 server and asks it, from outside, whether it works: did `boot()` report
@@ -140,6 +140,22 @@ nothing detected: a legend swatch read the wrong palette key, `undefined` reache
 that point called the draw functions directly and read back canvas pixels, which
 passes perfectly against a page that displays nothing. Each assertion in the file
 has been verified to fail against a deliberately reintroduced bug.
+
+`tools/check_no_local_paths.py` refuses any commit whose staged content carries
+an absolute path out of somebody's home directory — `C:\Users\…`, `/Users/…`,
+`/home/…`. It exists because one nearly shipped: a citation in
+`docs/ux-review-2026-08-03.md` was written by an agent that had been handed
+absolute paths in its brief, and it was caught by hand, which is not a control.
+Obvious placeholders (`/home/you/…`) still pass. The hook is versioned in
+`.githooks/` so it is reviewable in the diff; a fresh clone arms it once:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Run it over everything already tracked with `--all`. All seven of its cases —
+four leak shapes, three that must not fire — are verified against a staged file
+and a real `git commit`, not against the checker called directly.
 
 `tools/validate_graph.py` is a gate, not a formatter. It checks referential
 integrity, schema discipline and coordinate sanity, and it asserts the product's
