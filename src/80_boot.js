@@ -20,7 +20,23 @@ function setWindow(t0, t1) {
   S.win.t0 = a; S.win.t1 = b;
   changed();
 }
-function setSelection(id) { S.selection = id; changed(); }
+/* Where the selection came from is an argument, not something to infer. Under a
+   coarse pointer the detail panel is in grid row 3, roughly 1170px below a 46vh
+   stage, and the tooltip never fires on touch — it lives after the drag branch
+   returns — so a tap on a marker changes nothing the tapper can see. Only a
+   selection made ON a canvas scrolls the panel up: Escape passes null, a
+   data-goto hop is already inside the panel, and the guided path is driving the
+   stage itself. */
+const COARSE = matchMedia('(pointer:coarse)');
+function setSelection(id, opts) {
+  S.selection = id;
+  changed();
+  if (id && opts && opts.fromCanvas && COARSE.matches && elDetail) {
+    try {
+      elDetail.scrollIntoView({ block: 'start', behavior: RM.matches ? 'auto' : 'smooth' });
+    } catch (_) { elDetail.scrollIntoView(true); }
+  }
+}
 
 /* ------------------------------------------------------------------- globe */
 let gDrag = null, gMoved = 0;
@@ -155,7 +171,7 @@ function endGlobeDrag(e) {
       const d = Math.hypot(h.x - mx, h.y - my);
       if (d < h.r && d < bd) { bd = d; best = h; }
     }
-    setSelection(best ? best.id : null);
+    setSelection(best ? best.id : null, { fromCanvas: true });
   }
 }
 /* Lifting a finger mid-pinch must not end the gesture, and must not be read as a
@@ -263,7 +279,8 @@ ccv.addEventListener('pointermove', e => {
 });
 
 ccv.addEventListener('pointerup', e => {
-  if (cDrag && cDrag.mode === 'click') setSelection(cDrag.id === S.selection ? null : cDrag.id);
+  if (cDrag && cDrag.mode === 'click')
+    setSelection(cDrag.id === S.selection ? null : cDrag.id, { fromCanvas: true });
   else if (cDrag && cDrag.mode === 'pan' && cDrag.moved < 2) {
     const sc = SCALE || chronScale();
     S.cursor = Math.max(0, Math.min(T_MAX, sc.t(chronPos(e).x)));

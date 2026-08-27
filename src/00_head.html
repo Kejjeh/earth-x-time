@@ -325,6 +325,11 @@ button { background: none; border: none; cursor: pointer; padding: 0; }
 
 /* ============================================================ STAGE */
 #globe { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+/* The globe is exactly the size of .stage, and .stage is overflow:hidden, so the
+   shared :focus-visible ring — painted 2px OUTSIDE the border box — is clipped
+   away completely. On a role="application" element that swallows the arrow keys,
+   that leaves a keyboard user with no sign of where focus is. Paint it inside. */
+#globe:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--cyanotype); }
 #globe.dragging { cursor: grabbing; }
 .stage-tl { position: absolute; top: 12px; left: 14px; pointer-events: none; max-width: 60%; }
 .as-of {
@@ -433,6 +438,17 @@ button { background: none; border: none; cursor: pointer; padding: 0; }
 }
 @media (max-width: 860px) {
   body { overflow: auto; }
+  /* The strip is shrink-to-fit anchored right, inside an overflow:hidden stage,
+     so as the stage narrows it grows off the LEFT edge and is clipped: at 390px
+     "Guided path" spans -64 to -1, and #btn-tour is the only entry point the
+     tour has. Span the stage and scroll instead — and start at flex-start, not
+     flex-end, because content overflowing the START edge of a flex scroll
+     container cannot be scrolled to in Chromium or WebKit. */
+  .stage-tr { left: 12px; right: 12px; justify-content: flex-start;
+    overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+  .stage-tr::-webkit-scrollbar { display: none; }
+  .stage-tr .iconbtn { white-space: nowrap; flex: none; }
+  .stage-tl { top: 52px; }          /* the strip now owns the top line */
   .app { grid-template-columns: minmax(0,1fr) var(--rail-w); grid-template-rows: 46vh auto auto; height: auto; min-height: 100vh; min-height: 100dvh; }
   .stage { grid-column: 1; grid-row: 1; }
   .krail { grid-column: 2; grid-row: 1 / span 2; }
