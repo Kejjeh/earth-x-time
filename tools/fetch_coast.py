@@ -1,6 +1,15 @@
-import urllib.request, json, math, os
+"""Fetch Natural Earth 110m land and the PB2002 plate boundaries.
 
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "coast_out.txt")
+Simplifies, quantises to 1/32 degree, and delta+zigzag+base64 encodes both into
+the single payload src/20_core.js decodes at load. Writes assets/coast.txt -
+which is what tools/build.py reads. It used to write tools/coast_out.txt, a file
+nothing has ever read, so regenerating the coastline printed its byte counts,
+exited 0, and changed nothing about the built page.
+"""
+import urllib.request, json, math, os, sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+OUT = os.path.join(os.path.dirname(HERE), "assets", "coast.txt")
 ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-"
 SCALE = 32.0  # 1/32 degree ~ 3.5 km
 
@@ -100,6 +109,15 @@ def build(url, tol, min_area, label):
 land = build("https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_land.geojson", 0.42, 1.1, "land")
 plates = build("https://raw.githubusercontent.com/fraxen/tectonicplates/master/GeoJSON/PB2002_boundaries.json", 0.9, 0, "plates")
 
+# build() returns None when a download fails, and this used to write `land or ""`
+# into the file regardless. Now that the file is the one the build reads, one
+# flaky fetch would replace the shipped coastline with an empty payload and the
+# globe would come up with no land on it. Write both or write neither.
+missing = [n for n, v in (("land", land), ("plates", plates)) if not v]
+if missing:
+    sys.exit(f"FATAL: {', '.join(missing)} did not download; {OUT} left untouched")
+
+os.makedirs(os.path.dirname(OUT), exist_ok=True)
 with open(OUT, "w", encoding="utf-8") as f:
-    f.write("===LAND===\n" + (land or "") + "\n===PLATES===\n" + (plates or "") + "\n")
-print("wrote", OUT)
+    f.write("===LAND===\n" + land + "\n===PLATES===\n" + plates + "\n")
+print("wrote", OUT, f"{os.path.getsize(OUT):,} bytes")
