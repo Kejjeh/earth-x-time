@@ -161,8 +161,11 @@ rail ends, and compares that with what the Python tools read, whether every
 subject chip counts exactly the marks it accounts for, and whether Replay
 sweeps the rail the page actually has, and — by sampling the disc across
 forty-eight rotations in Chart mode — whether the filled coastline still covers
-about the 29% of Earth that is land rather than swallowing the globe. 74 checks,
-wired into `build.py`, exits non-zero.
+about the 29% of Earth that is land rather than swallowing the globe, whether
+the announcement a screen reader hears is a sentence rather than the whole
+panel, whether a held selection speaks when its date moves and stays quiet when
+it does not, and whether the causal graph can be walked from a keyboard.
+77 checks, wired into `build.py`, exits non-zero.
 
 It exists because this project lost an entire build to a boot failure that
 nothing detected: a legend swatch read the wrong palette key, `undefined` reached
@@ -265,9 +268,20 @@ for the same numbers.
   explanatory string now clears WCAG AA in both themes and over both basemaps,
   worst case 5.12:1, where the worst case used to be 2.74:1 — that one was
   broader than the review said, because `--chalk-faint` got *lighter* in light
-  mode and so failed in the dark theme too. Still open: the search-result
-  tooltip, the knowledge-rail landmarks of item 6, and the rest. See [`docs/ux-review-2026-08-03.md`](docs/ux-review-2026-08-03.md),
-  which covers this site and its sibling together.
+  mode and so failed in the dark theme too. The live region is a one-line status
+  node now rather than an 8.9 KB panel re-announced 226 times across one Replay,
+  and the causal graph keeps focus so it can be walked from a keyboard.
+
+  One claim in the review does not reproduce and nothing was changed for it:
+  scrubbing does **not** throw the panel back to the top. `scrollTop` belongs to
+  the element rather than to its children and survives an `innerHTML`
+  replacement — measured holding at 1662 while `scrollHeight` grew 2097 → 4049
+  across 1950 → 2025.
+
+  Still open: the knowledge-rail landmarks of item 6, naming the referents that
+  are off screen (item 7), and DOI links on `asserted_by` (item 12). See
+  [`docs/ux-review-2026-08-03.md`](docs/ux-review-2026-08-03.md), which covers
+  this site and its sibling together.
 
 ## Two deliberate departures
 

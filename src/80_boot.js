@@ -407,8 +407,15 @@ elDetail.addEventListener('click', e => {
   const b = e.target.closest('[data-goto]'); if (!b) return;
   const plan = revealReferent(b.dataset.goto);
   if (!plan) return;
+  /* The hop rebuilds the panel, so the button that had focus stops existing and
+     focus falls to <body> - which makes the causal graph unwalkable from the
+     keyboard: every step threw the user to the top of the document to Tab back.
+     Only re-aim focus if it was in the panel to begin with, so a mouse click
+     does not steal it from wherever it was. */
+  const hadFocus = elDetail.contains(document.activeElement);
   flyTo(plan);
   elDetail.scrollTop = 0;
+  if (hadFocus) elDetail.focus({ preventScroll: true });
 });
 
 /* Both of these are in the hash, so both have to go through changed().

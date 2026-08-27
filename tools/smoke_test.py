@@ -741,6 +741,83 @@ def run(url, headed, report):
         }""")
         page.wait_for_timeout(300)
 
+        # ------------- 19. the live region is a sentence, not the whole panel
+        # #detail carried aria-live="polite" and renderDetail rewrites it from
+        # the needPanel block that every setKt sets, so an 8.9 KB region was
+        # re-announced 226 times across one Replay. #tip was a second flood on
+        # top of it - role="status", rewritten on every hover pointermove.
+        live = page.evaluate("""() => ({
+          detailLive: document.getElementById('detail').getAttribute('aria-live'),
+          tipHidden: document.getElementById('tip').getAttribute('aria-hidden'),
+          tipRole: document.getElementById('tip').getAttribute('role'),
+          status: !!document.getElementById('sr-status'),
+          statusRole: (document.getElementById('sr-status') || {}).getAttribute
+                        ? document.getElementById('sr-status').getAttribute('role') : null
+        })""")
+        report.check("the announcement is a one-line status node, not the panel",
+                     live["detailLive"] is None and live["tipHidden"] == "true"
+                     and live["tipRole"] is None and live["status"]
+                     and live["statusRole"] == "status",
+                     json.dumps(live))
+
+        # A held selection scrubbed across the whole rail should speak when its
+        # date or its standing moves and stay quiet otherwise - the README leads
+        # with exactly that gesture. Keyed on the sentence it announced 109
+        # times, because the connection count climbs as edges arrive.
+        # Counted against the ground truth rather than against a bound: sweep the
+        # whole rail, count how many times the status node changes, and compare
+        # with how many times the resolved date / standing / disputedness
+        # actually changes. Equal means it speaks exactly when there is news.
+        chatter = page.evaluate("""() => {
+          const out = {};
+          for (const id of ['kpg_extinction', 'peopling_americas']) {
+            S.selection = null; changed();
+            setSelection(id);
+            const st = document.getElementById('sr-status');
+            let said = 0, lastSaid = null;
+            let real = 0, lastReal = null;
+            for (let k = KT_MIN; k <= KT_MAX; k++) {
+              setKt(k); renderNow();
+              if (st.textContent !== lastSaid) { said++; lastSaid = st.textContent; }
+              const r = resolve(id, k, S.resolver);
+              const truth = r
+                ? `${Math.round(r.pos)}|${r.winner ? r.winner.status : 'none'}|${r.disputed}`
+                : 'unresolved';
+              if (truth !== lastReal) { real++; lastReal = truth; }
+            }
+            out[id] = { said, real };
+          }
+          setKt(KT_MAX); S.selection = null; changed(); renderNow();
+          return out;
+        }""")
+        report.check("a held selection speaks exactly when its date or standing moves",
+                     all(v["said"] == v["real"] and v["real"] > 2 for v in chatter.values()),
+                     json.dumps(chatter))
+
+        # ------------------- 20. the causal graph can be walked from a keyboard
+        # The hop rebuilds the panel, so the button that had focus stops
+        # existing and focus fell to <body> - every step threw the user to the
+        # top of the document.
+        walk = page.evaluate("""() => {
+          setKt(KT_MAX); setSelection('kpg_extinction'); renderNow();
+          const b = document.querySelector('#detail [data-goto]');
+          if (!b) return { none: true };
+          b.focus();
+          const before = document.activeElement === b;
+          b.click();
+          return { before, target: b.dataset.goto };
+        }""")
+        page.wait_for_timeout(700)
+        landed = page.evaluate("""() => ({
+          selection: S.selection,
+          active: document.activeElement ? document.activeElement.tagName : null,
+          insideDetail: document.getElementById('detail').contains(document.activeElement)
+        })""")
+        report.check("a hop inside the panel keeps focus in the panel",
+                     walk.get("before") and landed["selection"] == walk.get("target")
+                     and landed["insideDetail"],
+                     json.dumps({**walk, **landed}))
+
         report.check("no page errors across the whole desktop run", not page_errors,
                      " | ".join(page_errors[:2]))
 
