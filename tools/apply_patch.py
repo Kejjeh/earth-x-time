@@ -59,6 +59,31 @@ def main():
     new_edges = patch.get("edges", [])
     removals = patch.get("removals", [])
 
+    # ---------------------------------------------------------- identifiers
+    # Everything below indexes these by name to say WHICH thing is wrong, so a
+    # missing one used to be a KeyError naming a dict key - no id, no referent,
+    # nothing an agent reading the output could act on. Entries without an id
+    # are reported and then dropped, so one missing field does not hide the
+    # rest of the report.
+    def _identified(items, field, what):
+        ok = []
+        for i, it in enumerate(items):
+            if not isinstance(it, dict) or not str(it.get(field) or "").strip():
+                err(f"{what} #{i + 1} has no {field}")
+            else:
+                ok.append(it)
+        return ok
+
+    new_refs = _identified(new_refs, "id", "new referent")
+    new_claims = _identified(new_claims, "id", "new claim")
+    new_edges = _identified(new_edges, "id", "edge")
+    removals = _identified(removals, "edge_id", "removal")
+    # `why` is only ever read in the report, which runs after the graph has been
+    # mutated - so a removal without one printed the success line and then died.
+    for r in removals:
+        if not str(r.get("why") or "").strip():
+            err(f"removal {r['edge_id']} has no `why` - a removal has to say what it is for")
+
     # ------------------------------------------------------------- collisions
     seen = set()
     for r in new_refs:

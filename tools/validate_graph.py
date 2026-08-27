@@ -167,6 +167,58 @@ def on_land(lat, lng, rings):
     return inside
 
 
+def km_to_coast(lat, lng, rings):
+    """Great-circle-ish distance to the nearest coastline vertex, in km.
+
+    Not the on_land test - that one is a ray cast, and distance is a bad
+    membership test for the reason on_land's docstring gives. This is here only
+    to describe a point that has ALREADY been flagged, because the number says
+    which kind of flag it is: a few km is a headland the 0.42-degree
+    simplification has swallowed, a few hundred is an island missing from the
+    110m dataset, and a few thousand is a sign error.
+    """
+    k = math.cos(math.radians(lat))
+    best = float("inf")
+    for ring in rings:
+        n = len(ring)
+        for i in range(n):
+            ax, ay = ring[i]
+            bx, by = ring[(i + 1) % n]
+            if abs(bx - ax) > 180:                    # the antimeridian seam
+                continue
+            ax, ay = (ax - lng) * k, ay - lat
+            bx, by = (bx - lng) * k, by - lat
+            dx, dy = bx - ax, by - ay
+            t = 0.0 if dx == dy == 0 else max(0.0, min(1.0, (-ax * dx - ay * dy) / (dx * dx + dy * dy)))
+            d = math.hypot(ax + t * dx, ay + t * dy)
+            if d < best:
+                best = d
+    return best * 111.32
+
+
+# Coordinates that read as offshore and have been checked, each with the reason
+# and the measured distance to the shipped coastline. The warning used to fire
+# on all 29 of these on every run, asking for a verification it gave nowhere to
+# record - so it said the same thing forever, and a genuine typo would have been
+# item 30 in a list of 29 known-good ones. Keyed by referent and coordinate
+# rounded to 0.1 degree, which is ~11 km: tight enough that a transposed digit
+# moves off the key, loose enough to survive a re-measured site.
+VERIFIED_OFFSHORE = {
+    ("earth_formation", 55.9, -2.3):
+        "Hutton's unconformity at Siccar Point - a coastal promontory, 1.2 km out",
+    ("origin_of_life", 58.3, -77.7):
+        "Nuvvuagittuq, eastern Hudson Bay shore (Dodd et al. 2017) - 2.9 km out",
+    ("cambrian_explosion", 47.1, -55.8):
+        "base-Cambrian section, Newfoundland (Linnemann et al. 2019) - 4.5 km out",
+    ("battle_of_hastings", 50.9, 0.5):
+        "Senlac Hill, East Sussex - inland, but the 0.42 degree coastline is ~20 km off here",
+    ("chicxulub_impact", 21.4, -89.5):
+        "crater centre on the north Yucatan coast - genuinely half offshore",
+    ("thera_eruption", 36.4, 25.4):
+        "the Santorini caldera - water by definition, and the island is absent from 110m",
+}
+
+
 def main():
     # Defaults to the live graph. It used to require a path because it was
     # written to check generated clusters before they were merged; running it on
@@ -324,13 +376,21 @@ def main():
     # centre, Thera's caldera). Only flag what no simplification explains.
     land = load_land()
     if land:
-        wet = []
+        wet, checked = [], 0
         for c in claims:
             gm = c["geometry"]
             if gm["mode"] != "point" or gm.get("lat") is None:
                 continue
-            if not on_land(gm["lat"], gm["lng"], land):
-                wet.append(f"{c['id']} ({c['about']}) at {gm['lat']:.2f},{gm['lng']:.2f}")
+            if on_land(gm["lat"], gm["lng"], land):
+                continue
+            root = c["about"] if c["about"] in rid else (cid.get(c["about"], {}) or {}).get("about")
+            key = (root, round(gm["lat"], 1), round(gm["lng"], 1))
+            if key in VERIFIED_OFFSHORE:
+                checked += 1
+                continue
+            wet.append(f"{c['id']} ({c['about']}) at {gm['lat']:.2f},{gm['lng']:.2f} "
+                       f"— {km_to_coast(gm['lat'], gm['lng'], land):,.0f} km from the "
+                       f"nearest coast")
         if wet:
             warns.append(f"{len(wet)} point coordinate(s) fall in water — verify each is "
                          f"genuinely offshore (a crater centre, a caldera, a drill site) "
@@ -419,6 +479,9 @@ def main():
     print(f"types:    " + str(collections.Counter(c['type'] for c in claims)))
     print(f"subjects: " + str(collections.Counter(s for c in claims for s in c['subjects'])))
     kt = [c["knowledge_time"] for c in claims]
+    if land:
+        print(f"offshore coordinates: {checked} verified "
+              f"({len(VERIFIED_OFFSHORE)} sites), {len(wet)} unaccounted for")
     print(f"knowledge_time span {min(kt)}–{max(kt)}  "
           f"(rail {KT_MIN}..{KT_MAX}, read from src/20_core.js)")
     print(f"resolver movers (consensus vs frontier): {len(movers)}")

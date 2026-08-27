@@ -205,6 +205,17 @@ understood in 2026, that the K–Pg date is disputed in 1970 and settled now, th
 consensus and newest resolvers disagree somewhere, and that Chicxulub → K–Pg is
 absent in 1975 and live by 1985. It exits non-zero on any of those.
 
+Its offshore-coordinate check used to warn about the same 29 points on every
+run, asking for a verification it gave nowhere to record — so it said the same
+thing forever, and a genuine typo would have been item 30 in a list of 29
+known-good ones. The triage is now in the file: six sites, each with its reason
+and its measured distance to the shipped coastline. Four are on land and inside
+the ~46 km a 0.42° simplification can move a coast (Siccar Point 1.2 km,
+Nuvvuagittuq 2.9, the Newfoundland base-Cambrian section 4.5, Senlac Hill ~20);
+Chicxulub's crater centre is genuinely half offshore; and Santorini reads 182 km
+out because the island is not in the 110m dataset at all. Anything else is
+reported with its distance, which says whether it is a headland or a sign error.
+
 Those assertions run through a `resolve()` that mirrors `src/30_model.js` line
 for line, because for a while they did not, and a gate that asks a different
 question is not a gate: it reported 24 resolver movers where the page moves 28,
