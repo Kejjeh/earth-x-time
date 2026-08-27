@@ -130,8 +130,10 @@ than the worker heartbeat quietly covering for a loop that never started), is
 the element under the middle of the stage really the canvas, does dragging
 rotate the globe, does a pinch zoom it, does a cancelled pinch strand the
 gesture, does the K–Pg link still appear in 1980 and harden in 1991, does a
-shared URL restore the view, can a hostile hash poison it. 41 checks, wired into
-`build.py`, exits non-zero.
+shared URL restore the view, can a hostile hash poison it, is a marker only as
+clickable as it is big, do the rival markers agree with the band they sit in, and
+does toggling the basemap reach the URL. 44 checks, wired into `build.py`,
+exits non-zero.
 
 It exists because this project lost an entire build to a boot failure that
 nothing detected: a legend swatch read the wrong palette key, `undefined` reached

@@ -254,8 +254,6 @@ function facts() { return FACTS || (FACTS = queryFacts(S)); }
 function epistemicCaption() {
   const F = facts();
   const kt = S.kt;
-  const chic = F.allEdges.find(e =>
-    e.edge.source === 'chicxulub_impact' && e.edge.target === 'kpg_extinction');
   const bits = [];
 
   if (kt < 1700) bits.push('The Earth has a history, but almost no one is counting it in years yet.');
@@ -271,6 +269,5 @@ function epistemicCaption() {
 
   const n = F.visible.length, d = F.disputedCount;
   bits.push(`${n} of ${Object.keys(R.referents).length} subjects visible, ${d} of them still disputed.`);
-  if (chic) bits.push(chic.superseded ? '' : '');
   return bits.filter(Boolean).join(' ');
 }

@@ -357,19 +357,24 @@ elDetail.addEventListener('click', e => {
   elDetail.scrollTop = 0;
 });
 
+/* Both of these are in the hash, so both have to go through changed().
+   Setting needGlobe alone left the URL describing a view the page was no longer
+   showing, and the setting then arrived in the hash on the next unrelated
+   interaction - the same silent history rewrite src/76_url.js already fixed once
+   for the selection. */
 document.getElementById('btn-basemap').addEventListener('click', e => {
   S.basemap = S.basemap === 'satellite' ? 'chart' : 'satellite';
   const sat = S.basemap === 'satellite';
   e.currentTarget.setAttribute('aria-pressed', String(sat));
   e.currentTarget.textContent = sat ? 'Satellite' : 'Chart';
   document.getElementById('stage').classList.toggle('space', sat);
-  needGlobe = true;
+  changed();
 });
 
 document.getElementById('btn-plates').addEventListener('click', e => {
   S.showPlates = !S.showPlates;
   e.currentTarget.setAttribute('aria-pressed', String(S.showPlates));
-  needGlobe = true;
+  changed();
 });
 document.getElementById('btn-now').addEventListener('click', () => { stopReplay(); setKt(KT_MAX); });
 document.getElementById('btn-play').addEventListener('click', () => S.playing ? stopReplay() : startReplay());
@@ -613,7 +618,6 @@ function isAnimating() {
   if (Math.abs(S.spin.lam) > 0.008 || Math.abs(S.spin.phi) > 0.008) return true;
   if (S.playing || TW) return true;              // Replay, and the guided path
   return facts().edges.length > 0;               // arcs animate continuously
-  return false;
 }
 
 function onBeat() {

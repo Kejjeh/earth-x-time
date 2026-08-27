@@ -210,7 +210,10 @@ function readPalette() {
                    'land', 'land-edge', 'plate'])
     CSSV[k] = cs.getPropertyValue('--' + k).trim();
 }
-function subjColor(subjects) { return CSSV[subjects[0]] || CSSV.chalk_dim || '#888'; }
+/* The palette is keyed by the CSS custom-property name, so the dim-chalk
+   fallback is CSSV['chalk-dim']. CSSV.chalk_dim is never set, and reading it
+   sent every unknown subject to the hard-coded grey instead of the theme. */
+function subjColor(subjects) { return CSSV[subjects[0]] || CSSV['chalk-dim'] || '#888'; }
 
 function withAlpha(hex, a) {
   // Defensive: a missing palette key used to throw here, and the throw killed

@@ -791,7 +791,10 @@ function readPalette() {
                    'land', 'land-edge', 'plate'])
     CSSV[k] = cs.getPropertyValue('--' + k).trim();
 }
-function subjColor(subjects) { return CSSV[subjects[0]] || CSSV.chalk_dim || '#888'; }
+/* The palette is keyed by the CSS custom-property name, so the dim-chalk
+   fallback is CSSV['chalk-dim']. CSSV.chalk_dim is never set, and reading it
+   sent every unknown subject to the hard-coded grey instead of the theme. */
+function subjColor(subjects) { return CSSV[subjects[0]] || CSSV['chalk-dim'] || '#888'; }
 
 function withAlpha(hex, a) {
   // Defensive: a missing palette key used to throw here, and the throw killed
@@ -1103,8 +1106,6 @@ function facts() { return FACTS || (FACTS = queryFacts(S)); }
 function epistemicCaption() {
   const F = facts();
   const kt = S.kt;
-  const chic = F.allEdges.find(e =>
-    e.edge.source === 'chicxulub_impact' && e.edge.target === 'kpg_extinction');
   const bits = [];
 
   if (kt < 1700) bits.push('The Earth has a history, but almost no one is counting it in years yet.');
@@ -1120,7 +1121,6 @@ function epistemicCaption() {
 
   const n = F.visible.length, d = F.disputedCount;
   bits.push(`${n} of ${Object.keys(R.referents).length} subjects visible, ${d} of them still disputed.`);
-  if (chic) bits.push(chic.superseded ? '' : '');
   return bits.filter(Boolean).join(' ');
 }
 
@@ -1766,9 +1766,13 @@ function drawGlobe(dt) {
       gx.fillStyle = withAlpha(col, it.dimmed ? 0.03 : 0.055); gx.fill();
     }
 
-    // A node pulled back only to carry an edge is a supporting player.
-    drawMarker(sx, sy, it.viaEdge ? Math.min(it.res.significance, 2) : it.res.significance,
-      col, st, {
+    // A node pulled back only to carry an edge is a supporting player. Its
+    // drawn size is the one everything else has to agree with: the hit target
+    // and the rolled-up count were sized from the full significance, so a
+    // recalled dot of radius 4.9 claimed a 16 px invisible target and stole
+    // hovers and clicks from whatever was drawn under it.
+    const sig = it.viaEdge ? Math.min(it.res.significance, 2) : it.res.significance;
+    drawMarker(sx, sy, sig, col, st, {
         selected: it.id === S.selection,
         dimmed: it.dimmed,
         disputed: it.res.disputed,
@@ -1778,10 +1782,10 @@ function drawGlobe(dt) {
     if (it.rolledUp) {
       gx.font = `600 9px ${'xt-mono'}, monospace`;
       gx.fillStyle = CSSV['chalk-dim'];
-      gx.fillText('+' + it.rolledUp, sx + markerRadius(it.res.significance) + 3, sy - 5);
+      gx.fillText('+' + it.rolledUp, sx + markerRadius(sig) + 3, sy - 5);
     }
 
-    HIT.push({ id: it.id, x: sx, y: sy, r: markerRadius(it.res.significance) + 7 });
+    HIT.push({ id: it.id, x: sx, y: sy, r: markerRadius(sig) + 7 });
 
     const strong = it.id === S.selection || it.id === S.hover;
     if (!it.dimmed && (strong || (it.res.significance >= 4 && !it.viaEdge)))
@@ -1937,7 +1941,12 @@ function drawFacts(sc, yTop, h) {
       cx2.moveTo(xw, y); cx2.lineTo(xy, y);
       cx2.strokeStyle = withAlpha(col, 0.35); cx2.stroke();
 
-      for (const alt of r.dated) {
+      /* pool, not dated: the markers sit inside the band, and the band is the
+         envelope of the claims competing for the DATE. Drawing every claim that
+         merely carries one puts hollow markers outside their own band and
+         overstates the disagreement - Chicxulub drew thirteen where six claims
+         actually rival each other. */
+      for (const alt of r.pool) {
         if (alt === r.winner) continue;
         const ax = sc.x(alt.claim.earth_time_start);
         if (ax < -10 || ax > CW + 10) continue;
@@ -3106,19 +3115,24 @@ elDetail.addEventListener('click', e => {
   elDetail.scrollTop = 0;
 });
 
+/* Both of these are in the hash, so both have to go through changed().
+   Setting needGlobe alone left the URL describing a view the page was no longer
+   showing, and the setting then arrived in the hash on the next unrelated
+   interaction - the same silent history rewrite src/76_url.js already fixed once
+   for the selection. */
 document.getElementById('btn-basemap').addEventListener('click', e => {
   S.basemap = S.basemap === 'satellite' ? 'chart' : 'satellite';
   const sat = S.basemap === 'satellite';
   e.currentTarget.setAttribute('aria-pressed', String(sat));
   e.currentTarget.textContent = sat ? 'Satellite' : 'Chart';
   document.getElementById('stage').classList.toggle('space', sat);
-  needGlobe = true;
+  changed();
 });
 
 document.getElementById('btn-plates').addEventListener('click', e => {
   S.showPlates = !S.showPlates;
   e.currentTarget.setAttribute('aria-pressed', String(S.showPlates));
-  needGlobe = true;
+  changed();
 });
 document.getElementById('btn-now').addEventListener('click', () => { stopReplay(); setKt(KT_MAX); });
 document.getElementById('btn-play').addEventListener('click', () => S.playing ? stopReplay() : startReplay());
@@ -3362,7 +3376,6 @@ function isAnimating() {
   if (Math.abs(S.spin.lam) > 0.008 || Math.abs(S.spin.phi) > 0.008) return true;
   if (S.playing || TW) return true;              // Replay, and the guided path
   return facts().edges.length > 0;               // arcs animate continuously
-  return false;
 }
 
 function onBeat() {

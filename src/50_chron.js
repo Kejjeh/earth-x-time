@@ -144,7 +144,12 @@ function drawFacts(sc, yTop, h) {
       cx2.moveTo(xw, y); cx2.lineTo(xy, y);
       cx2.strokeStyle = withAlpha(col, 0.35); cx2.stroke();
 
-      for (const alt of r.dated) {
+      /* pool, not dated: the markers sit inside the band, and the band is the
+         envelope of the claims competing for the DATE. Drawing every claim that
+         merely carries one puts hollow markers outside their own band and
+         overstates the disagreement - Chicxulub drew thirteen where six claims
+         actually rival each other. */
+      for (const alt of r.pool) {
         if (alt === r.winner) continue;
         const ax = sc.x(alt.claim.earth_time_start);
         if (ax < -10 || ax > CW + 10) continue;
