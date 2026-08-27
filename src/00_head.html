@@ -457,6 +457,26 @@ button { background: none; border: none; cursor: pointer; padding: 0; }
   .detail { overflow: visible; }
 }
 
+/* A one-finger vertical swipe has to scroll the page. With touch-action:none on
+   all three surfaces it never did: at 390x844 the page is 1572px tall in an
+   870px viewport, and a 240px upward swipe took the globe from phi 12 to -89,
+   or knowledge-time from 2026 to 1979, with scrollY still 0 — while on the
+   timeline, whose pan reads only clientX, it did nothing at all. That is 718px
+   of an 870px first screen that refuses to scroll.
+
+   pan-y hands the vertical axis back to the browser and keeps everything
+   horizontal-dominant. The browser fires pointercancel when it takes a gesture
+   over, which the pointer bookkeeping in src/80_boot.js already handles.
+
+   The trade, deliberately: kSet reads only clientY, so the knowledge rail's
+   vertical drag-scrub is gone on touch. Tap-to-set stays, so do Home/End and
+   the arrow keys, and an unrequested 47-year jump is worse than losing a scrub.
+   Vertical rotation of the globe survives through the two-finger path, whose
+   midpoint handler already moves both lam and phi. */
+@media (pointer: coarse) {
+  #globe, #krailcv, #chroncv { touch-action: pan-y; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }

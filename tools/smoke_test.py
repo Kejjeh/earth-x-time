@@ -689,6 +689,91 @@ def run_mobile(url, headed, report):
                      or (ring["offset"] or "").startswith("-"),
                      json.dumps(ring)[:140])
 
+        # ------------- a swipe up scrolls the page, it does not rewrite the view
+        # All three surfaces carried touch-action:none, so the browser never got
+        # the gesture: a 240px upward swipe took the globe from phi 12 to -89,
+        # or knowledge-time from 2026 to 1979, with scrollY still 0 - and on the
+        # timeline, whose pan reads only clientX, it did nothing at all. That was
+        # 718px of an 870px first screen that refused to scroll.
+        cdpm = ctx.new_cdp_session(page)
+
+        def mtouch(kind, points):
+            cdpm.send("Input.dispatchTouchEvent", {
+                "type": kind,
+                "touchPoints": [{"x": x, "y": y, "id": i} for i, (x, y) in enumerate(points)]})
+
+        def swipe_up(x, y, dist=240, steps=12):
+            mtouch("touchStart", [(x, y)])
+            for i in range(1, steps + 1):
+                mtouch("touchMove", [(x, y - dist * i / steps)])
+                page.wait_for_timeout(8)
+            mtouch("touchEnd", [])
+            page.wait_for_timeout(450)
+
+        for name, sel, probe in (
+                ("globe", "#globe", "S.rot.phi"),
+                ("knowledge rail", "#krailcv", "S.kt"),
+                ("timeline", "#chroncv", "S.win.t1")):
+            page.evaluate("""(s) => {
+              scrollTo(0, 0); setKt(KT_MAX); S.rot.lam = 30; S.rot.phi = 12;
+              setWindow(0, 4.6e9); TW = null; changed(); renderNow();
+            }""", sel)
+            page.wait_for_timeout(250)
+            spot = page.evaluate("""(s) => {
+              const r = document.querySelector(s).getBoundingClientRect();
+              return { x: r.left + r.width * 0.5, y: r.top + r.height * 0.6 };
+            }""", sel)
+            before = page.evaluate(probe)
+            swipe_up(spot["x"], spot["y"])
+            after = page.evaluate(probe)
+            scrolled = page.evaluate("scrollY")
+            report.check(f"a swipe on the {name} scrolls the page and leaves the view alone",
+                         scrolled > 40 and after == before,
+                         f"scrollY {scrolled}   {probe} {before} -> {after}")
+
+        # ------------------- and the gestures that are the point still work
+        page.evaluate("scrollTo(0, 0); S.rot.lam = 30; TW = null; changed(); renderNow();")
+        page.wait_for_timeout(250)
+        gspot = page.evaluate("""() => {
+          const r = document.getElementById('globe').getBoundingClientRect();
+          return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+        }""")
+        lam0 = page.evaluate("S.rot.lam")
+        mtouch("touchStart", [(gspot["cx"] - 90, gspot["cy"])])
+        for i in range(1, 13):
+            mtouch("touchMove", [(gspot["cx"] - 90 + 15 * i, gspot["cy"])])
+            page.wait_for_timeout(8)
+        mtouch("touchEnd", [])
+        page.wait_for_timeout(350)
+        report.check("a horizontal drag still rotates the globe on touch",
+                     abs(page.evaluate("S.rot.lam") - lam0) > 5 and page.evaluate("scrollY") == 0,
+                     f"lam {lam0} -> {page.evaluate('S.rot.lam'):.1f}")
+
+        page.evaluate("scrollTo(0, 0); setKt(KT_MAX); renderNow();")
+        page.wait_for_timeout(200)
+        kspot = page.evaluate("""() => {
+          const r = document.getElementById('krailcv').getBoundingClientRect();
+          return { x: r.left + r.width * 0.6, y: r.top + r.height * 0.7 };
+        }""")
+        page.touchscreen.tap(kspot["x"], kspot["y"])
+        page.wait_for_timeout(400)
+        report.check("a tap still sets the year on the rail",
+                     page.evaluate("S.kt") < 2026, f"kt -> {page.evaluate('S.kt')}")
+
+        page.evaluate("scrollTo(0, 0); setKt(KT_MAX); setZoom(1.0); S.rot.phi = 12; renderNow();")
+        page.wait_for_timeout(200)
+        z0m = page.evaluate("ZOOMF")
+        mtouch("touchStart", [(gspot["cx"] - 30, gspot["cy"]), (gspot["cx"] + 30, gspot["cy"])])
+        for d in (50, 70, 90, 110):
+            mtouch("touchMove", [(gspot["cx"] - d, gspot["cy"]), (gspot["cx"] + d, gspot["cy"])])
+            page.wait_for_timeout(16)
+        mtouch("touchEnd", [(gspot["cx"] + 110, gspot["cy"])])
+        mtouch("touchEnd", [])
+        page.wait_for_timeout(350)
+        report.check("two fingers still zoom the globe on touch",
+                     page.evaluate("ZOOMF") - z0m > 0.2 and page.evaluate("PTRS.size") == 0,
+                     f"ZOOMF {z0m:.2f} -> {page.evaluate('ZOOMF'):.2f}")
+
         report.check("no page errors on the phone build", not page_errors,
                      " | ".join(page_errors[:2]))
         browser.close()

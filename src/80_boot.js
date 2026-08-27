@@ -119,7 +119,14 @@ gcv.addEventListener('pointermove', e => {
     gMoved += Math.abs(dx) + Math.abs(dy);
     const k = 180 / (GR * Math.PI) * 1.1;
     S.rot.lam += dx * k;
-    S.rot.phi = Math.max(-89, Math.min(89, S.rot.phi + dy * k));
+    /* One finger does not own the vertical axis - the page does, so that a
+       swipe up scrolls. touch-action:pan-y is not enough on its own: the moves
+       delivered before the browser commits to scrolling still tilted the globe,
+       12 degrees to 2 in a single swipe. Two fingers rotate in both axes; the
+       pinch handler moves lam and phi together from the midpoint. */
+    if (e.pointerType !== 'touch') {
+      S.rot.phi = Math.max(-89, Math.min(89, S.rot.phi + dy * k));
+    }
     gVel.push({ dx, dy, t: performance.now() });
     if (gVel.length > 5) gVel.shift();
     gDrag = { x: e.clientX, y: e.clientY, t: performance.now() };
@@ -321,14 +328,37 @@ document.getElementById('presets').addEventListener('click', e => {
 });
 
 /* ------------------------------------------------------------------- krail */
-let kDrag = false;
+/* The rail scrubs vertically, which on a touchscreen is the same gesture as
+   scrolling the page. It used to win that fight from the first pointermove: a
+   240px swipe moved knowledge-time from 2026 to 1979 with scrollY still 0. And
+   acting on pointerdown is no better - a finger landing here on its way past is
+   not a request to jump two centuries.
+
+   So on touch the rail is tap-to-set: nothing happens until the finger lifts,
+   and only if it barely moved. Under a mouse or a pen, where the press IS the
+   gesture and there is no scroll to lose, the drag-scrub is untouched. */
+let kDrag = false, kTouch = false, kMoved = 0, kDownY = 0;
+const K_TAP_SLOP = 8;
 function kSet(e) {
   const r = kcv.getBoundingClientRect();
   setKt(yToKt(e.clientY - r.top));
 }
-kcv.addEventListener('pointerdown', e => { try { kcv.setPointerCapture(e.pointerId); } catch (_) {} kDrag = true; stopReplay(); kSet(e); });
-kcv.addEventListener('pointermove', e => { if (kDrag) kSet(e); });
-kcv.addEventListener('pointerup', () => { kDrag = false; });
+kcv.addEventListener('pointerdown', e => {
+  try { kcv.setPointerCapture(e.pointerId); } catch (_) {}
+  stopReplay();
+  kDrag = true; kTouch = e.pointerType === 'touch'; kMoved = 0; kDownY = e.clientY;
+  if (!kTouch) kSet(e);
+});
+kcv.addEventListener('pointermove', e => {
+  if (!kDrag) return;
+  kMoved = Math.max(kMoved, Math.abs(e.clientY - kDownY));
+  if (kTouch) return;
+  kSet(e);
+});
+kcv.addEventListener('pointerup', e => {
+  if (kDrag && kTouch && kMoved < K_TAP_SLOP) kSet(e);
+  kDrag = false;
+});
 kcv.addEventListener('pointercancel', () => { kDrag = false; });
 kcv.addEventListener('keydown', e => {
   const step = e.shiftKey ? 25 : 1;

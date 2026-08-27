@@ -142,8 +142,10 @@ Then it opens a second context at 390x844 with real touch and asks the phone
 build the questions the desktop one cannot: can a finger reach every control on
 the stage, does tapping a marker put its panel where you can see it, does
 choosing a search result fly a globe that is on screen, is the globe's focus
-ring inside its own clipping box. 61 checks, wired into `build.py`, exits
-non-zero.
+ring inside its own clipping box, does a swipe up scroll the page rather than
+rewrite the view — and, because that fix trades something away, do a horizontal
+drag, a tap on the rail and a two-finger pinch all still do what they did.
+67 checks, wired into `build.py`, exits non-zero.
 
 It exists because this project lost an entire build to a boot failure that
 nothing detected: a legend swatch read the wrong palette key, `undefined` reached
@@ -218,9 +220,12 @@ for the same numbers.
   of the smoke test. A hop inside the panel now goes through the same gate
   `chooseResult` does — and that gate no longer throws away a window someone
   panned to in order to reveal something already inside it — and `Compare eras`
-  now makes the rest of the page `inert` instead of only claiming to. Still
-  open: the scroll-versus-rotate conflict on touch, light-mode contrast on the
-  stage overlays, and the rest. See [`docs/ux-review-2026-08-03.md`](docs/ux-review-2026-08-03.md),
+  now makes the rest of the page `inert` instead of only claiming to. A swipe up
+  scrolls the page instead of slamming the globe to the pole or moving
+  knowledge-time by forty-seven years — which costs the rail's vertical
+  drag-scrub on touch, deliberately: tap-to-set, the arrow keys and `Home`/`End`
+  all remain, and the globe still tilts under two fingers. Still open:
+  light-mode contrast on the stage overlays, and the rest. See [`docs/ux-review-2026-08-03.md`](docs/ux-review-2026-08-03.md),
   which covers this site and its sibling together.
 
 ## Two deliberate departures
