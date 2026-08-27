@@ -368,9 +368,16 @@ document.getElementById('subjects').addEventListener('dblclick', e => {
   changed();
 });
 
+/* A Connections link used to be a bare setSelection, which skipped every gate
+   chooseResult applies: with a subject switched off it selected a referent with
+   no mark on the globe or the timeline and rendered a full panel for it anyway.
+   Same helper, same guarantees. No stage scroll - the reader is looking at the
+   panel, and the panel rebuilds in place. */
 elDetail.addEventListener('click', e => {
   const b = e.target.closest('[data-goto]'); if (!b) return;
-  setSelection(b.dataset.goto);
+  const plan = revealReferent(b.dataset.goto);
+  if (!plan) return;
+  flyTo(plan);
   elDetail.scrollTop = 0;
 });
 
@@ -404,24 +411,65 @@ document.getElementById('btn-theme').addEventListener('click', () => {
 });
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { readPalette(); markAll(); });
 
+/* The dialog carries role="dialog" aria-modal="true", which tells assistive
+   technology that everything outside it is hidden. Nothing made that true:
+   focus stayed on the opener - inside the part just declared hidden - thirty
+   background controls remained tabbable, and Tab walked straight out. inert
+   makes the claim honest, and the opener gets its focus back on the way out. */
 const diffwrap = document.getElementById('diffwrap');
-document.getElementById('btn-diff').addEventListener('click', e => {
-  const on = diffwrap.hidden;
+const btnDiff = document.getElementById('btn-diff');
+const diffA = document.getElementById('diff-a');
+const diffB = document.getElementById('diff-b');
+let diffOpener = null;
+
+function setDiffOpen(on) {
+  if (on === !diffwrap.hidden) return;
   diffwrap.hidden = !on;
-  e.currentTarget.setAttribute('aria-pressed', String(on));
-  if (on) { document.getElementById('diff-b').value = S.kt; renderDiff(); }
-});
-document.getElementById('diff-close').addEventListener('click', () => {
-  diffwrap.hidden = true;
-  document.getElementById('btn-diff').setAttribute('aria-pressed', 'false');
-});
-document.getElementById('diff-a').addEventListener('input', e => { S.ktA = +e.target.value || 1975; renderDiff(); });
-document.getElementById('diff-b').addEventListener('input', e => { setKt(+e.target.value || KT_MAX); renderDiff(); });
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && !diffwrap.hidden) {
-    diffwrap.hidden = true;
-    document.getElementById('btn-diff').setAttribute('aria-pressed', 'false');
+  btnDiff.setAttribute('aria-pressed', String(on));
+  for (const el of [document.querySelector('.app'), document.getElementById('tourbar')]) {
+    if (el) el.toggleAttribute('inert', on);
   }
+  if (on) {
+    diffOpener = document.activeElement;
+    diffB.value = S.kt;
+    diffA.value = S.ktA;
+    renderDiff();
+    diffA.focus();
+  } else {
+    const back = diffOpener && diffOpener.isConnected ? diffOpener : btnDiff;
+    diffOpener = null;
+    try { back.focus(); } catch (_) { /* it may have gone away; never fatal */ }
+  }
+}
+
+btnDiff.addEventListener('click', () => setDiffOpen(diffwrap.hidden));
+document.getElementById('diff-close').addEventListener('click', () => setDiffOpen(false));
+
+/* Take a year only once it is a complete one that exists on the rail. Clamping
+   per keystroke would snap the "1" on the way to "1850" to 1650 and make the
+   field unusable; `+value || dflt` was worse still, because 0 is falsy, so the
+   first character of "2000" silently jumped the comparison to 1975. The field
+   is reconciled with the state on change, so it can never be left showing a
+   year the page is not actually comparing. */
+function yearFromInput(el) {
+  const n = parseInt(el.value, 10);
+  return isFinite(n) && n >= KT_MIN && n <= KT_MAX ? n : null;
+}
+diffA.addEventListener('input', () => {
+  const n = yearFromInput(diffA);
+  if (n === null) return;
+  S.ktA = n; renderDiff();
+});
+diffB.addEventListener('input', () => {
+  const n = yearFromInput(diffB);
+  if (n === null) return;
+  setKt(n); renderDiff();
+});
+diffA.addEventListener('change', () => { diffA.value = S.ktA; renderDiff(); });
+diffB.addEventListener('change', () => { diffB.value = S.kt; renderDiff(); });
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !diffwrap.hidden) setDiffOpen(false);
 });
 
 /* -------------------------------------------------------------- guided path */

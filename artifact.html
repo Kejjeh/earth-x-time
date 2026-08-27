@@ -2253,6 +2253,44 @@ function edgeLink(ed, dir) {
 
 function renderDetail() {
   const F = facts();
+
+  /* A real referent that resolve() cannot place at this knowledge-time. Reached
+     by a shared link - #k=1700&s=homo_sapiens - and it used to fall through to
+     "Nothing selected" while the selection was set and still in the URL. That is
+     not an error state: it is the most interesting thing the page has to say,
+     and resolve() has already worked out the year it changes. */
+  if (S.selection && !F.items[S.selection] &&
+      Object.prototype.hasOwnProperty.call(R.referents, S.selection)) {
+    const ref = R.referents[S.selection];
+    const first = firstDatedYear(S.selection);
+    const pending = (R.byRef[S.selection] || [])
+      .filter(c => c.knowledge_time > S.kt)
+      .sort((a, b) => a.knowledge_time - b.knowledge_time);
+    elDetail.innerHTML = `
+      <div class="dt-head">
+        <div class="dt-kind"><span class="tag">${esc(ref.kind)}</span></div>
+        <h2>${esc(ref.label)}</h2>
+      </div>
+      <div class="resolved">
+        <span class="lbl" style="display:block;margin-bottom:4px">Not yet known in ${S.kt}</span>
+        <div class="big">no dated claim</div>
+        <p class="prov">Nothing datable has been asserted about this in
+        <b class="num">${S.kt}</b>. The page is not hiding it — in this year, nobody
+        had put a number on it.</p>
+        ${isFinite(first) ? `<p class="prov"><button class="edge-link" data-goto="${esc(ref.id)}"
+          style="padding:2px 0"><span><span class="who">Go to ${first}</span>
+          <span class="mech">the year the first dated claim arrives</span></span></button></p>` : ''}
+      </div>
+      ${pending.length ? `<div class="sect">
+        <span class="lbl">What is still to come · ${pending.length}</span>
+        ${pending.slice(0, 8).map(c => `<div class="claim pending" style="--cl:var(--rule)">
+          <p class="stmt">${esc(c.statement)}</p>
+          <p class="src">${esc(c.asserted_by)} — arrives in <span class="kt num">${c.knowledge_time}</span></p>
+        </div>`).join('')}
+      </div>` : ''}`;
+    return;
+  }
+
   if (!S.selection || !F.items[S.selection]) {
     const disp = F.visible.filter(i => i.res.disputed)
       .sort((a, b) => (b.res.oldest - b.res.youngest) - (a.res.oldest - a.res.youngest))
@@ -2473,8 +2511,7 @@ const SEARCH_IDX = (() => {
       // The year resolve() can first place it, not the year anyone first said
       // anything about it - those differ, and the label has to match what
       // choosing the row will actually do.
-      first: claims.filter(c => !c._meta && isFinite(c.earth_time_start))
-        .reduce((m, c) => Math.min(m, c.knowledge_time), Infinity)
+      first: firstDatedYear(id)
     });
   }
   return out;
@@ -2538,20 +2575,31 @@ function closeResults() {
   elSearchNote.textContent = '';
 }
 
-/* Getting there is not enough: a result can be invisible because knowledge-time
-   is earlier than the claim, because its field of study is switched off, or
-   because another field is isolated. Choosing it opens whatever is in the way. */
-function chooseResult(id) {
-  if (!Object.prototype.hasOwnProperty.call(R.referents, id)) return;
-  const claims = R.byRef[id] || [];
+/** The year resolve() can first place a referent, or Infinity if it never can. */
+function firstDatedYear(id) {
+  return (R.byRef[id] || [])
+    /* Only claims that resolve() will actually count. Taking the minimum over
+       ALL claims picks up undated and _meta ones, so a referent whose earliest
+       DATED claim is 1953 but which carries a 1785 interpretation reported
+       "first claimed 1785" and then selected into an empty panel, because
+       resolve() returns null when nothing dated is live. Mirror its predicate. */
+    .filter(c => !c._meta && isFinite(c.earth_time_start))
+    .reduce((m, c) => Math.min(m, c.knowledge_time), Infinity);
+}
+
+/* Getting there is not enough: a referent can be invisible because
+   knowledge-time is earlier than the claim, because its field of study is
+   switched off, or because another field is isolated. This opens whatever is in
+   the way and returns the view that shows it — it mutates the filters, and
+   leaves the flying to the caller.
+
+   It exists because chooseResult did all of this and the panel's own Connections
+   links did none of it: a hop selected a referent with no mark on the globe or
+   the timeline and rendered a full panel for it anyway. */
+function revealReferent(id) {
+  if (!Object.prototype.hasOwnProperty.call(R.referents, id)) return null;
   let kt = S.kt;
-  /* Only claims that resolve() will actually count. Taking the minimum over ALL
-     claims picks up undated and _meta ones, so a referent whose earliest DATED
-     claim is 1953 but which carries a 1785 interpretation reported "first
-     claimed 1785" and then selected into an empty panel, because resolve()
-     returns null when nothing dated is live. Mirror its predicate exactly. */
-  const dated = claims.filter(c => !c._meta && isFinite(c.earth_time_start));
-  const first = dated.reduce((m, c) => Math.min(m, c.knowledge_time), Infinity);
+  const first = firstDatedYear(id);
   if (isFinite(first) && first > kt) kt = Math.min(KT_MAX, first);
 
   const res = resolve(id, kt, S.resolver);
@@ -2559,9 +2607,20 @@ function chooseResult(id) {
     if (S.focus && !res.subjects.includes(S.focus)) S.focus = null;
     if (!res.subjects.some(s => S.subjects.has(s))) for (const s of res.subjects) S.subjects.add(s);
   }
-  const t1 = res && isFinite(res.oldest)
-    ? Math.max(2000, Math.min(T_MAX, res.oldest * 1.7))
-    : S.win.t1;
+  /* Widen only when the target is actually outside the window. Widening every
+     time threw away a window someone had panned to, in order to "reveal"
+     something that was already inside it. */
+  let win = [S.win.t0, S.win.t1];
+  if (res && isFinite(res.oldest) &&
+      (res.oldest > S.win.t1 || res.youngest < S.win.t0)) {
+    win = [0, Math.max(2000, Math.min(T_MAX, res.oldest * 1.7))];
+  }
+  return { id, kt, win, res };
+}
+
+function chooseResult(id) {
+  const plan = revealReferent(id);
+  if (!plan) return;
   closeResults();
   elSearch.blur();
   /* On a phone the search box is in grid row 3 and the globe is row 1, so
@@ -2573,7 +2632,7 @@ function chooseResult(id) {
     try { stage.scrollIntoView({ block: 'start', behavior: RM.matches ? 'auto' : 'smooth' }); }
     catch (_) { stage.scrollIntoView(true); }
   }
-  flyTo({ id, kt, win: [0, t1] });
+  flyTo(plan);
 }
 
 let searchTimer = null;
@@ -3151,9 +3210,16 @@ document.getElementById('subjects').addEventListener('dblclick', e => {
   changed();
 });
 
+/* A Connections link used to be a bare setSelection, which skipped every gate
+   chooseResult applies: with a subject switched off it selected a referent with
+   no mark on the globe or the timeline and rendered a full panel for it anyway.
+   Same helper, same guarantees. No stage scroll - the reader is looking at the
+   panel, and the panel rebuilds in place. */
 elDetail.addEventListener('click', e => {
   const b = e.target.closest('[data-goto]'); if (!b) return;
-  setSelection(b.dataset.goto);
+  const plan = revealReferent(b.dataset.goto);
+  if (!plan) return;
+  flyTo(plan);
   elDetail.scrollTop = 0;
 });
 
@@ -3187,24 +3253,65 @@ document.getElementById('btn-theme').addEventListener('click', () => {
 });
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { readPalette(); markAll(); });
 
+/* The dialog carries role="dialog" aria-modal="true", which tells assistive
+   technology that everything outside it is hidden. Nothing made that true:
+   focus stayed on the opener - inside the part just declared hidden - thirty
+   background controls remained tabbable, and Tab walked straight out. inert
+   makes the claim honest, and the opener gets its focus back on the way out. */
 const diffwrap = document.getElementById('diffwrap');
-document.getElementById('btn-diff').addEventListener('click', e => {
-  const on = diffwrap.hidden;
+const btnDiff = document.getElementById('btn-diff');
+const diffA = document.getElementById('diff-a');
+const diffB = document.getElementById('diff-b');
+let diffOpener = null;
+
+function setDiffOpen(on) {
+  if (on === !diffwrap.hidden) return;
   diffwrap.hidden = !on;
-  e.currentTarget.setAttribute('aria-pressed', String(on));
-  if (on) { document.getElementById('diff-b').value = S.kt; renderDiff(); }
-});
-document.getElementById('diff-close').addEventListener('click', () => {
-  diffwrap.hidden = true;
-  document.getElementById('btn-diff').setAttribute('aria-pressed', 'false');
-});
-document.getElementById('diff-a').addEventListener('input', e => { S.ktA = +e.target.value || 1975; renderDiff(); });
-document.getElementById('diff-b').addEventListener('input', e => { setKt(+e.target.value || KT_MAX); renderDiff(); });
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && !diffwrap.hidden) {
-    diffwrap.hidden = true;
-    document.getElementById('btn-diff').setAttribute('aria-pressed', 'false');
+  btnDiff.setAttribute('aria-pressed', String(on));
+  for (const el of [document.querySelector('.app'), document.getElementById('tourbar')]) {
+    if (el) el.toggleAttribute('inert', on);
   }
+  if (on) {
+    diffOpener = document.activeElement;
+    diffB.value = S.kt;
+    diffA.value = S.ktA;
+    renderDiff();
+    diffA.focus();
+  } else {
+    const back = diffOpener && diffOpener.isConnected ? diffOpener : btnDiff;
+    diffOpener = null;
+    try { back.focus(); } catch (_) { /* it may have gone away; never fatal */ }
+  }
+}
+
+btnDiff.addEventListener('click', () => setDiffOpen(diffwrap.hidden));
+document.getElementById('diff-close').addEventListener('click', () => setDiffOpen(false));
+
+/* Take a year only once it is a complete one that exists on the rail. Clamping
+   per keystroke would snap the "1" on the way to "1850" to 1650 and make the
+   field unusable; `+value || dflt` was worse still, because 0 is falsy, so the
+   first character of "2000" silently jumped the comparison to 1975. The field
+   is reconciled with the state on change, so it can never be left showing a
+   year the page is not actually comparing. */
+function yearFromInput(el) {
+  const n = parseInt(el.value, 10);
+  return isFinite(n) && n >= KT_MIN && n <= KT_MAX ? n : null;
+}
+diffA.addEventListener('input', () => {
+  const n = yearFromInput(diffA);
+  if (n === null) return;
+  S.ktA = n; renderDiff();
+});
+diffB.addEventListener('input', () => {
+  const n = yearFromInput(diffB);
+  if (n === null) return;
+  setKt(n); renderDiff();
+});
+diffA.addEventListener('change', () => { diffA.value = S.ktA; renderDiff(); });
+diffB.addEventListener('change', () => { diffB.value = S.kt; renderDiff(); });
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !diffwrap.hidden) setDiffOpen(false);
 });
 
 /* -------------------------------------------------------------- guided path */
