@@ -557,6 +557,30 @@ def run(url, headed, report):
                      page.evaluate("document.activeElement.id") == "btn-diff",
                      page.evaluate("document.activeElement.id || document.activeElement.tagName"))
 
+        # ------- 14. the numbers validate_graph.py gates on, asked of the page
+        # Two implementations of one resolver, pinned to the same figures from
+        # both sides. The validator used to assert these against a resolver that
+        # was not the product's, and reported 24 movers where the page moves 28
+        # and a disputed K-Pg where the page settles it.
+        numbers = page.evaluate("""() => {
+          let movers = 0;
+          for (const id in R.referents) {
+            const c = resolve(id, KT_MAX, 'consensus'), f = resolve(id, KT_MAX, 'frontier');
+            if (c && f && Math.round(c.pos) !== Math.round(f.pos)) movers++;
+          }
+          const then = resolve('kpg_extinction', 1970, 'consensus');
+          const now = resolve('kpg_extinction', KT_MAX, 'consensus');
+          return { referents: Object.keys(R.referents).length, movers,
+                   kpgDisputed1970: !!(then && then.disputed),
+                   kpgDisputedNow: !!(now && now.disputed) };
+        }""")
+        report.check("28 of the 57 referents move under Newest",
+                     numbers["referents"] == 57 and numbers["movers"] == 28,
+                     json.dumps(numbers))
+        report.check("the K-Pg date is disputed in 1970 and settled now",
+                     numbers["kpgDisputed1970"] and not numbers["kpgDisputedNow"],
+                     json.dumps(numbers))
+
         report.check("no page errors across the whole desktop run", not page_errors,
                      " | ".join(page_errors[:2]))
 
