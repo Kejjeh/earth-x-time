@@ -27,7 +27,7 @@ hypothetical.
 Requires playwright with chromium (`pip install playwright && playwright install
 chromium`). Exits non-zero on any failure, so it can gate a build.
 """
-import argparse, functools, http.server, json, os, socketserver, sys, threading
+import argparse, base64, functools, http.server, json, os, re, socketserver, sys, threading
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -779,6 +779,145 @@ def run_mobile(url, headed, report):
         browser.close()
 
 
+# Relative luminance and contrast ratio, WCAG 2.x.
+def _lum(rgb):
+    out = []
+    for v in rgb:
+        v = v / 255.0
+        out.append(v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4)
+    return 0.2126 * out[0] + 0.7152 * out[1] + 0.0722 * out[2]
+
+
+def _ratio(a, b):
+    l1, l2 = _lum(a), _lum(b)
+    return (max(l1, l2) + 0.05) / (min(l1, l2) + 0.05)
+
+
+def _rgb(css):
+    m = re.match(r"rgba?\(([^)]+)\)", css or "")
+    if not m:
+        return None
+    parts = [float(x) for x in re.split(r"[,\s/]+", m.group(1).strip()) if x]
+    return parts[:3]
+
+
+# Everything here is 9.5-12px, so none of it is "large text" and none of it gets
+# the 3:1 exemption. These are the strings that say what the axes are.
+SMALL_TEXT = ["#subhint", ".instrument .lbl", "#presets button", "#resnote",
+              "#search-note", ".detail .empty", ".chron-bar .rd", ".iconbtn"]
+# The stage is the awkward one: .stage.space is a fixed dark gradient with
+# imagery over it, so its backdrop does not follow the theme while its text did.
+# A computed backgroundColor cannot see a gradient, so these are measured by
+# photographing the overlay's own box with the overlays hidden.
+STAGE_TEXT = ["#epistemic", ".as-of", ".stage-bl .legend div"]
+AA = 4.5
+
+COMPUTED_CONTRAST = """(sels) => {
+  const parse = str => { const m = String(str).match(/rgba?\\(([^)]+)\\)/); if (!m) return null;
+    const p = m[1].split(/[,\\s\\/]+/).filter(Boolean).map(Number);
+    return { rgb: p.slice(0, 3), a: p.length > 3 ? p[3] : 1 }; };
+  const out = [];
+  for (const s of sels) {
+    const el = document.querySelector(s);
+    if (!el) { out.push({ s, missing: true }); continue; }
+    const cs = getComputedStyle(el);
+    const fg = parse(cs.color); if (!fg) continue;
+    const chain = []; for (let n = el.parentElement; n; n = n.parentElement) chain.push(n);
+    chain.reverse();
+    let bg = [255, 255, 255];
+    for (const n of chain) {
+      const c = parse(getComputedStyle(n).backgroundColor);
+      if (!c || c.a === 0) continue;
+      bg = [0, 1, 2].map(i => c.rgb[i] * c.a + bg[i] * (1 - c.a));
+    }
+    const f = [0, 1, 2].map(i => fg.rgb[i] * fg.a + bg[i] * (1 - fg.a));
+    out.push({ s, fg: f, bg, size: cs.fontSize });
+  }
+  return out;
+}"""
+
+
+def _backdrop(page, sel):
+    """The pixels actually painted behind an overlay, with the overlays hidden."""
+    box = page.evaluate("""(s) => {
+      const el = document.querySelector(s); if (!el) return null;
+      const r = el.getBoundingClientRect();
+      if (r.width < 4 || r.height < 4) return null;
+      return { color: getComputedStyle(el).color, size: getComputedStyle(el).fontSize,
+               x: Math.round(r.left), y: Math.round(r.top),
+               w: Math.round(r.width), h: Math.round(r.height) };
+    }""", sel)
+    if not box:
+        return None
+    page.evaluate("() => { for (const n of document.querySelectorAll('.stage-tl, .stage-bl'))"
+                  " n.style.visibility = 'hidden'; }")
+    page.wait_for_timeout(180)
+    shot = page.screenshot(clip={"x": box["x"], "y": box["y"],
+                                 "width": box["w"], "height": box["h"]})
+    page.evaluate("() => { for (const n of document.querySelectorAll('.stage-tl, .stage-bl'))"
+                  " n.style.visibility = ''; }")
+    page.wait_for_timeout(120)
+    mean = page.evaluate("""async (b64) => {
+      const img = new Image();
+      await new Promise(r => { img.onload = r; img.src = 'data:image/png;base64,' + b64; });
+      const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+      const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, c.width, c.height).data;
+      let r = 0, gg = 0, bb = 0, n = 0;
+      for (let i = 0; i < d.length; i += 4) { r += d[i]; gg += d[i+1]; bb += d[i+2]; n++; }
+      return [r / n, gg / n, bb / n];
+    }""", base64.b64encode(shot).decode())
+    return box, mean
+
+
+def run_contrast(url, headed, report):
+    """Both themes, both basemaps, measured rather than eyeballed.
+
+    --chalk-faint used to sit at 3.32:1 in dark and 2.98:1 in light - where it
+    got LIGHTER, which is backwards - and the stage overlays measured 3.25:1 in
+    light over imagery, because .stage.space is a fixed dark gradient and only
+    the text followed the theme.
+    """
+    from playwright.sync_api import sync_playwright
+
+    print("\n  -- contrast, both themes --", flush=True)
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=not headed)
+        for scheme in ("dark", "light"):
+            ctx = browser.new_context(viewport={"width": 1440, "height": 900},
+                                      device_scale_factor=1, color_scheme=scheme)
+            page = ctx.new_page()
+            page.goto(url, wait_until="load", timeout=45000)
+            page.wait_for_timeout(1500)
+            page.evaluate("S.selection = null; changed(); renderNow();")
+            page.wait_for_timeout(250)
+
+            worst = []
+            for row in page.evaluate(COMPUTED_CONTRAST, SMALL_TEXT):
+                if row.get("missing"):
+                    worst.append((0.0, row["s"] + " (missing)"))
+                    continue
+                worst.append((_ratio(row["fg"], row["bg"]), f"{row['s']} @{row['size']}"))
+            for basemap in ("satellite", "chart"):
+                if basemap == "chart":
+                    page.click("#btn-basemap")
+                    page.wait_for_timeout(700)
+                for sel in STAGE_TEXT:
+                    got = _backdrop(page, sel)
+                    if not got:
+                        continue
+                    box, bg = got
+                    fg = _rgb(box["color"])
+                    worst.append((_ratio(fg, bg), f"{sel} @{box['size']} over {basemap}"))
+
+            worst.sort()
+            lo, who = worst[0]
+            report.check(f"every small string clears AA in {scheme} mode",
+                         lo >= AA, f"worst {lo:.2f}:1  {who}")
+            ctx.close()
+        browser.close()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--url", default=None, help="test a deployed URL instead of the local build")
@@ -800,6 +939,7 @@ def main():
     try:
         run(url, a.headed, report)
         run_mobile(url, a.headed, report)
+        run_contrast(url, a.headed, report)
     finally:
         if httpd:
             httpd.shutdown()

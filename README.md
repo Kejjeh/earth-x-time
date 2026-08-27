@@ -145,7 +145,12 @@ choosing a search result fly a globe that is on screen, is the globe's focus
 ring inside its own clipping box, does a swipe up scroll the page rather than
 rewrite the view — and, because that fix trades something away, do a horizontal
 drag, a tap on the rail and a two-finger pinch all still do what they did.
-67 checks, wired into `build.py`, exits non-zero.
+
+Then it loads the page once more in each theme and measures the contrast of
+every small explanatory string against its real background — photographing the
+painted pixels behind the stage overlays, because a computed `background-color`
+cannot see the gradient they sit on. 69 checks, wired into `build.py`, exits
+non-zero.
 
 It exists because this project lost an entire build to a boot failure that
 nothing detected: a legend swatch read the wrong palette key, `undefined` reached
@@ -224,8 +229,12 @@ for the same numbers.
   scrolls the page instead of slamming the globe to the pole or moving
   knowledge-time by forty-seven years — which costs the rail's vertical
   drag-scrub on touch, deliberately: tap-to-set, the arrow keys and `Home`/`End`
-  all remain, and the globe still tilts under two fingers. Still open:
-  light-mode contrast on the stage overlays, and the rest. See [`docs/ux-review-2026-08-03.md`](docs/ux-review-2026-08-03.md),
+  all remain, and the globe still tilts under two fingers. Every small
+  explanatory string now clears WCAG AA in both themes and over both basemaps,
+  worst case 5.12:1, where the worst case used to be 2.74:1 — that one was
+  broader than the review said, because `--chalk-faint` got *lighter* in light
+  mode and so failed in the dark theme too. Still open: the search-result
+  tooltip, the knowledge-rail landmarks of item 6, and the rest. See [`docs/ux-review-2026-08-03.md`](docs/ux-review-2026-08-03.md),
   which covers this site and its sibling together.
 
 ## Two deliberate departures
