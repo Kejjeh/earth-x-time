@@ -159,8 +159,10 @@ painted pixels behind the stage overlays, because a computed `background-color`
 cannot see the gradient they sit on. And it asks the page where the knowledge
 rail ends, and compares that with what the Python tools read, whether every
 subject chip counts exactly the marks it accounts for, and whether Replay
-sweeps the rail the page actually has. 73 checks, wired into `build.py`, exits
-non-zero.
+sweeps the rail the page actually has, and — by sampling the disc across
+forty-eight rotations in Chart mode — whether the filled coastline still covers
+about the 29% of Earth that is land rather than swallowing the globe. 74 checks,
+wired into `build.py`, exits non-zero.
 
 It exists because this project lost an entire build to a boot failure that
 nothing detected: a legend swatch read the wrong palette key, `undefined` reached

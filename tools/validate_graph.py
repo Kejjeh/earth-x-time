@@ -268,7 +268,22 @@ def main():
         if len(zb) != 2 or zb[0] > zb[1]:
             warns.append(f"{w}: bad zoom_band {zb} -> [0,10]")
             c["zoom_band"] = [0, 10]
-        c["significance"] = max(1, min(5, int(c.get("significance", 3))))
+        # significance decides marker radius on both the globe and the timeline,
+        # and >=5 overrides the zoom band outright, so a value quietly rewritten
+        # is a rendering decision made behind the author. Every other repair in
+        # this loop reports itself; this one used to rewrite the file and say
+        # nothing, and a non-numeric one was a traceback rather than an error
+        # line naming the claim.
+        raw = c.get("significance", 3)
+        if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+            errors.append(f"{w}: significance {raw!r} is not a number")
+            c["significance"] = 3
+        else:
+            sig = max(1, min(5, int(raw)))
+            if sig != raw:
+                warns.append(f"{w}: significance {raw} -> {sig}")
+                fixes.append(c["id"])
+            c["significance"] = sig
 
     # ---- edges ------------------------------------------------------------
     seen_edge = set()

@@ -681,6 +681,66 @@ def run(url, headed, report):
                      and rail_ticks["outsideCanvas"] == [],
                      json.dumps(rail_ticks))
 
+        # ---------- 18. the filled coastline does not swallow the globe
+        # drawLandRing cuts each ring at the horizon and closes the gaps by
+        # following the limb, choosing the sweep from the ring's own orientation.
+        # The cheap alternative - collapsing hidden vertices onto the rim - turns
+        # any continent straddling the horizon into a polygon that floods the
+        # disc, and nothing here was measuring whether it does. Earth is ~29%
+        # land; a hemisphere runs from about 0.05 (mid-Pacific) to 0.55.
+        page.evaluate("""() => {
+          S.basemap = 'chart'; S.showPlates = false;
+          document.getElementById('stage').classList.remove('space');
+          S.selection = null; TW = null; changed(); renderNow();
+        }""")
+        page.wait_for_timeout(400)
+        fill = page.evaluate("""() => {
+          const g = document.getElementById('globe').getContext('2d');
+          const h = CSSV.land.replace('#', '');
+          const LR = parseInt(h.slice(0, 2), 16),
+                LG = parseInt(h.slice(2, 4), 16),
+                LB = parseInt(h.slice(4, 6), 16);
+          const fracs = [];
+          for (let lam = -180; lam < 180; lam += 30) {
+            for (const phi of [-60, -20, 20, 60]) {
+              S.rot.lam = lam; S.rot.phi = phi; needGlobe = true; renderNow();
+              const img = g.getImageData(0, 0, Math.round(GW * DPR), Math.round(GH * DPR));
+              const d = img.data, W = img.width;
+              let inDisc = 0, isLand = 0;
+              for (let i = 0; i < 48; i++) for (let j = 0; j < 48; j++) {
+                const x = Math.round((i + 0.5) * W / 48),
+                      y = Math.round((j + 0.5) * img.height / 48);
+                const dx = x / DPR - GCX, dy = y / DPR - GCY;
+                if (dx * dx + dy * dy > (GR * 0.93) * (GR * 0.93)) continue;
+                inDisc++;
+                const k = (y * W + x) * 4;
+                if (Math.abs(d[k] - LR) < 14 && Math.abs(d[k + 1] - LG) < 14 &&
+                    Math.abs(d[k + 2] - LB) < 14) isLand++;
+              }
+              if (inDisc > 100) fracs.push({ lam, phi, f: isLand / inDisc });
+            }
+          }
+          const fs = fracs.map(x => x.f);
+          const worst = fracs.slice().sort((a, b) => b.f - a.f)[0];
+          return {
+            views: fracs.length,
+            min: +Math.min(...fs).toFixed(3),
+            max: +Math.max(...fs).toFixed(3),
+            mean: +(fs.reduce((a, b) => a + b, 0) / fs.length).toFixed(3),
+            worst: worst && { lam: worst.lam, phi: worst.phi, f: +worst.f.toFixed(3) }
+          };
+        }""")
+        report.check("the filled coastline never floods the globe",
+                     fill["views"] >= 40 and fill["max"] <= 0.70
+                     and fill["min"] >= 0.005 and 0.18 <= fill["mean"] <= 0.40,
+                     json.dumps(fill))
+        page.evaluate("""() => {
+          S.basemap = 'satellite'; S.showPlates = true;
+          document.getElementById('stage').classList.add('space');
+          S.rot.lam = 30; S.rot.phi = 12; changed(); renderNow();
+        }""")
+        page.wait_for_timeout(300)
+
         report.check("no page errors across the whole desktop run", not page_errors,
                      " | ".join(page_errors[:2]))
 
