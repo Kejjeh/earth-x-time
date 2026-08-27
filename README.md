@@ -79,6 +79,13 @@ Writes `earth-x-time.html` (standalone) and `artifact.html` (body-only, for a
 host that supplies its own `<head>`). ~720 KB, entirely self-contained, and the
 build refuses to finish if the smoke test fails.
 
+Each generator writes the `assets/` file the build reads, and refuses to write
+at all unless everything it needed arrived — a half-downloaded coastline would
+otherwise replace the shipped one with an empty payload and the globe would come
+up with no land on it. Two of them used to write into `tools/` instead, where
+nothing reads, so regenerating printed byte counts, exited 0, and changed
+nothing.
+
 | Asset | Source | Generator |
 |---|---|---|
 | Coastlines, plate boundaries | Natural Earth 110m land, PB2002 | `tools/fetch_coast.py` |
