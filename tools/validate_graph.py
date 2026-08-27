@@ -12,10 +12,12 @@ import json, sys, os, html, math, collections
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
-# Mirrors KT_MIN/KT_MAX in src/20_core.js. The ceiling is "now", not a
-# constant: the record keeps moving, and a claim the rail cannot reach is a
-# claim whose status entry can never fire.
-KT_MIN, KT_MAX = 1650, 2026
+sys.path.insert(0, HERE)
+# Read from src/20_core.js, never mirrored here. The ceiling is "now", not a
+# constant: the record keeps moving, a claim the rail cannot reach is a claim
+# whose status entry can never fire, and a hand-copied ceiling drifts - two of
+# the four copies of it were still on 2025 long after the rail reached 2026.
+from knowledge_time import KT_MIN, KT_MAX  # noqa: E402
 
 SUBJECTS = {"geology", "biology", "evolution", "chemistry", "human_history", "astronomy"}
 STATUSES = {"proposed", "contested", "consensus", "superseded"}
@@ -402,7 +404,8 @@ def main():
     print(f"types:    " + str(collections.Counter(c['type'] for c in claims)))
     print(f"subjects: " + str(collections.Counter(s for c in claims for s in c['subjects'])))
     kt = [c["knowledge_time"] for c in claims]
-    print(f"knowledge_time span {min(kt)}–{max(kt)}")
+    print(f"knowledge_time span {min(kt)}–{max(kt)}  "
+          f"(rail {KT_MIN}..{KT_MAX}, read from src/20_core.js)")
     print(f"resolver movers (consensus vs frontier): {len(movers)}")
     for m in movers[:8]:
         print(f"    {m[0]}: {m[1]:,.0f} -> {m[2]:,.0f} ybp")

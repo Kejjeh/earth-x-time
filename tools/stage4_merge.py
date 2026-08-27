@@ -23,6 +23,8 @@ def unescape(o):
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
+sys.path.insert(0, HERE)
+from knowledge_time import KT_MIN, KT_MAX  # noqa: E402
 SUBJECTS = {"geology", "biology", "evolution", "chemistry", "human_history", "astronomy"}
 STATUSES = {"proposed", "contested", "consensus", "superseded"}
 TYPES = {"existence", "dating", "location", "causal", "interpretation"}
@@ -56,8 +58,9 @@ def check(c, known_referents):
         bad.append(f"needs >=2 subjects, has {c['subjects']}")
     if set(c["subjects"]) - SUBJECTS:
         bad.append(f"unknown subjects {sorted(set(c['subjects']) - SUBJECTS)}")
-    if not (1650 <= c["knowledge_time"] <= 2025):
-        bad.append(f"knowledge_time {c['knowledge_time']} out of range")
+    if not (KT_MIN <= c["knowledge_time"] <= KT_MAX):
+        bad.append(f"knowledge_time {c['knowledge_time']} out of "
+                   f"[{KT_MIN},{KT_MAX}]")
     if c["earth_time_end"] > c["earth_time_start"]:
         bad.append("earth_time_end is older than earth_time_start")
     if not (0 <= c["earth_time_start"] <= 4.6e9):

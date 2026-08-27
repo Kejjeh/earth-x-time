@@ -21,7 +21,12 @@ import urllib.request, urllib.parse, json, re, sys, os, math, time, argparse
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 PRESENT = 2025                    # ybp is measured from here, as in the app
-KT_MIN, KT_MAX = 1650, 2025
+sys.path.insert(0, HERE)
+# Read from src/20_core.js rather than mirrored. NOT the same quantity as
+# PRESENT, however alike the numbers have looked: PRESENT is the epoch every
+# stored ybp is measured from, and moving it would move every date in the
+# dataset. KT_MAX is how recent a paper the rail can reach.
+from knowledge_time import KT_MIN, KT_MAX  # noqa: E402
 
 MAILTO = "joshp1001@gmail.com"    # Crossref/OpenAlex polite pool
 UA = {"User-Agent": f"EarthXTime-ingest/0.1 (https://github.com/kejjeh; mailto:{MAILTO})"}
@@ -359,9 +364,18 @@ def ingest_qid(qid, existing_by_qid, existing_ids, report):
                                f"{len(refs)} reference(s), none resolvable to a citation")
                 continue
 
+            # A claim is only as good as the year on its source. Clamping a
+            # 2026 citation to 2025 emitted a sourced-looking claim with the
+            # wrong source, and `kt or KT_MAX` invented a publication year for a
+            # citation carrying none - both in the tool whose one rule is that
+            # no source means no fact. Drop it, and say so.
             kt = citation.get("year")
-            if not kt or not (KT_MIN <= kt <= KT_MAX):
-                kt = max(KT_MIN, min(KT_MAX, kt or KT_MAX))
+            if not isinstance(kt, int) or not (KT_MIN <= kt <= KT_MAX):
+                dropped.append(f"{qid} {pid} ({ybp:,.0f} ybp): citation "
+                               f"{citation.get('doi') or citation.get('text')} has no usable "
+                               f"year ({kt!r}); knowledge_time must be a real one in "
+                               f"[{KT_MIN},{KT_MAX}]")
+                continue
             status = RANK_STATUS.get(st.get("rank", "normal"), "proposed")
 
             cid = f"clm_{ref_id}_{pid.lower()}_{abs(hash((qid, pid, round(ybp), citation['doi'] or citation['text']))) % 10**6}"
