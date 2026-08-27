@@ -640,9 +640,13 @@ function drawGlobe(dt) {
       gx.fillStyle = withAlpha(col, it.dimmed ? 0.03 : 0.055); gx.fill();
     }
 
-    // A node pulled back only to carry an edge is a supporting player.
-    drawMarker(sx, sy, it.viaEdge ? Math.min(it.res.significance, 2) : it.res.significance,
-      col, st, {
+    // A node pulled back only to carry an edge is a supporting player. Its
+    // drawn size is the one everything else has to agree with: the hit target
+    // and the rolled-up count were sized from the full significance, so a
+    // recalled dot of radius 4.9 claimed a 16 px invisible target and stole
+    // hovers and clicks from whatever was drawn under it.
+    const sig = it.viaEdge ? Math.min(it.res.significance, 2) : it.res.significance;
+    drawMarker(sx, sy, sig, col, st, {
         selected: it.id === S.selection,
         dimmed: it.dimmed,
         disputed: it.res.disputed,
@@ -652,10 +656,10 @@ function drawGlobe(dt) {
     if (it.rolledUp) {
       gx.font = `600 9px ${'xt-mono'}, monospace`;
       gx.fillStyle = CSSV['chalk-dim'];
-      gx.fillText('+' + it.rolledUp, sx + markerRadius(it.res.significance) + 3, sy - 5);
+      gx.fillText('+' + it.rolledUp, sx + markerRadius(sig) + 3, sy - 5);
     }
 
-    HIT.push({ id: it.id, x: sx, y: sy, r: markerRadius(it.res.significance) + 7 });
+    HIT.push({ id: it.id, x: sx, y: sy, r: markerRadius(sig) + 7 });
 
     const strong = it.id === S.selection || it.id === S.hover;
     if (!it.dimmed && (strong || (it.res.significance >= 4 && !it.viaEdge)))

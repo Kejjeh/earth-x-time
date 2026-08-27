@@ -189,9 +189,8 @@ def run(url, headed, report):
         })""")
         report.check("legend swatches are styled", all(s and s != "MISSING" for s in sw),
                      json.dumps(sw)[:120])
-        report.check("subject chips rendered",
-                     page.evaluate("document.getElementById('subjects').children.length") == 6,
-                     f"{page.evaluate('document.getElementById(\"subjects\").children.length')} chips")
+        chips = page.evaluate("document.getElementById('subjects').children.length")
+        report.check("subject chips rendered", chips == 6, f"{chips} chips")
 
         # --------------------------------------------------- 5. does it respond
         lam0 = page.evaluate("S.rot.lam")
@@ -330,6 +329,75 @@ def run(url, headed, report):
                          txt[:60].replace("\n", " "))
             page.keyboard.press("Escape")
             page.wait_for_timeout(120)
+
+        # ------------------------------- 7b. what is drawn is what is clickable
+        # A node recalled only to carry an edge is drawn small (significance
+        # capped at 2). Its hit target was sized from the UNCAPPED significance,
+        # so a 4.9 px dot claimed a 16 px invisible circle and stole hovers and
+        # clicks from whatever was under it.
+        page.evaluate("S.selection = null; markAll(); renderNow();")
+        page.wait_for_timeout(150)
+        mismatch = page.evaluate("""() => {
+          const bad = [];
+          for (const it of facts().visible) {
+            if (!it.viaEdge) continue;
+            // planet-wide facts ride the horizon instead of being markers, and
+            // carry their own fixed-radius hit target; they are not this check.
+            const h = HIT.find(x => x.id === it.id && !x.global);
+            if (!h) continue;
+            const drawn = markerRadius(Math.min(it.res.significance, 2)) + 7;
+            if (Math.abs(h.r - drawn) > 0.01) bad.push({ id: it.id, hit: h.r, drawn });
+          }
+          return bad;
+        }""")
+        report.check("edge-recalled markers are only as clickable as they are big",
+                     mismatch == [], json.dumps(mismatch)[:160])
+
+        # --------------------------- 7c. the rival markers agree with their band
+        # The band is the envelope of the claims competing for the DATE (res.pool).
+        # The hollow markers inside it were drawn from res.dated - every live claim
+        # carrying any date at all - so markers landed outside their own band and
+        # overstated the disagreement. Radius 3 is the alt-marker radius and
+        # nothing else in drawFacts uses it (a winner is 2.5 + significance*0.85,
+        # never below 3.35).
+        marks = page.evaluate("""() => {
+          const ctx = document.getElementById('chroncv').getContext('2d');
+          const real = ctx.arc.bind(ctx);
+          let n = 0;
+          ctx.arc = function (x, y, r, a, b, c) { if (r === 3) n++; return real(x, y, r, a, b, c); };
+          needChron = true; drawChron();
+          ctx.arc = real;
+          let pool = 0, dated = 0;
+          for (const it of facts().visible) {
+            const r = it.res;
+            if (!(r.disputed || S.resolver === 'spread')) continue;
+            pool += r.pool.filter(l => l !== r.winner).length;
+            dated += r.dated.filter(l => l !== r.winner).length;
+          }
+          return { drawn: n, pool, dated };
+        }""")
+        # Off-window markers are skipped, so drawn can only ever be <= the pool.
+        # What must never happen is drawing more than the pool has in it.
+        report.check("rival markers come from the claims competing for the date",
+                     marks["drawn"] <= marks["pool"] and marks["pool"] < marks["dated"],
+                     json.dumps(marks))
+
+        # ------------------------------------------ 7d. every setting has a URL
+        # encodeHash carries the basemap and the plate overlay, but the two
+        # buttons only marked the globe dirty, so the toggle never wrote the hash
+        # and the setting then arrived in it on the next unrelated interaction.
+        page.evaluate("writeHash(true)")
+        before = page.evaluate("location.hash")
+        page.click("#btn-basemap")
+        page.click("#btn-plates")
+        page.wait_for_timeout(600)
+        after = page.evaluate("location.hash")
+        report.check("toggling the basemap and the plates reaches the URL",
+                     "b=chart" in after and "p=0" in after,
+                     f"{before[:40]} -> {after[:70]}")
+        page.click("#btn-basemap")
+        page.click("#btn-plates")
+        page.wait_for_timeout(600)
 
         # -------------------------------------------------------- 8. URL state
         st = page.evaluate("typeof writeHash === 'function'")
