@@ -25,8 +25,7 @@ const SEARCH_IDX = (() => {
       // The year resolve() can first place it, not the year anyone first said
       // anything about it - those differ, and the label has to match what
       // choosing the row will actually do.
-      first: claims.filter(c => !c._meta && isFinite(c.earth_time_start))
-        .reduce((m, c) => Math.min(m, c.knowledge_time), Infinity)
+      first: firstDatedYear(id)
     });
   }
   return out;
@@ -90,20 +89,31 @@ function closeResults() {
   elSearchNote.textContent = '';
 }
 
-/* Getting there is not enough: a result can be invisible because knowledge-time
-   is earlier than the claim, because its field of study is switched off, or
-   because another field is isolated. Choosing it opens whatever is in the way. */
-function chooseResult(id) {
-  if (!Object.prototype.hasOwnProperty.call(R.referents, id)) return;
-  const claims = R.byRef[id] || [];
+/** The year resolve() can first place a referent, or Infinity if it never can. */
+function firstDatedYear(id) {
+  return (R.byRef[id] || [])
+    /* Only claims that resolve() will actually count. Taking the minimum over
+       ALL claims picks up undated and _meta ones, so a referent whose earliest
+       DATED claim is 1953 but which carries a 1785 interpretation reported
+       "first claimed 1785" and then selected into an empty panel, because
+       resolve() returns null when nothing dated is live. Mirror its predicate. */
+    .filter(c => !c._meta && isFinite(c.earth_time_start))
+    .reduce((m, c) => Math.min(m, c.knowledge_time), Infinity);
+}
+
+/* Getting there is not enough: a referent can be invisible because
+   knowledge-time is earlier than the claim, because its field of study is
+   switched off, or because another field is isolated. This opens whatever is in
+   the way and returns the view that shows it — it mutates the filters, and
+   leaves the flying to the caller.
+
+   It exists because chooseResult did all of this and the panel's own Connections
+   links did none of it: a hop selected a referent with no mark on the globe or
+   the timeline and rendered a full panel for it anyway. */
+function revealReferent(id) {
+  if (!Object.prototype.hasOwnProperty.call(R.referents, id)) return null;
   let kt = S.kt;
-  /* Only claims that resolve() will actually count. Taking the minimum over ALL
-     claims picks up undated and _meta ones, so a referent whose earliest DATED
-     claim is 1953 but which carries a 1785 interpretation reported "first
-     claimed 1785" and then selected into an empty panel, because resolve()
-     returns null when nothing dated is live. Mirror its predicate exactly. */
-  const dated = claims.filter(c => !c._meta && isFinite(c.earth_time_start));
-  const first = dated.reduce((m, c) => Math.min(m, c.knowledge_time), Infinity);
+  const first = firstDatedYear(id);
   if (isFinite(first) && first > kt) kt = Math.min(KT_MAX, first);
 
   const res = resolve(id, kt, S.resolver);
@@ -111,9 +121,20 @@ function chooseResult(id) {
     if (S.focus && !res.subjects.includes(S.focus)) S.focus = null;
     if (!res.subjects.some(s => S.subjects.has(s))) for (const s of res.subjects) S.subjects.add(s);
   }
-  const t1 = res && isFinite(res.oldest)
-    ? Math.max(2000, Math.min(T_MAX, res.oldest * 1.7))
-    : S.win.t1;
+  /* Widen only when the target is actually outside the window. Widening every
+     time threw away a window someone had panned to, in order to "reveal"
+     something that was already inside it. */
+  let win = [S.win.t0, S.win.t1];
+  if (res && isFinite(res.oldest) &&
+      (res.oldest > S.win.t1 || res.youngest < S.win.t0)) {
+    win = [0, Math.max(2000, Math.min(T_MAX, res.oldest * 1.7))];
+  }
+  return { id, kt, win, res };
+}
+
+function chooseResult(id) {
+  const plan = revealReferent(id);
+  if (!plan) return;
   closeResults();
   elSearch.blur();
   /* On a phone the search box is in grid row 3 and the globe is row 1, so
@@ -125,7 +146,7 @@ function chooseResult(id) {
     try { stage.scrollIntoView({ block: 'start', behavior: RM.matches ? 'auto' : 'smooth' }); }
     catch (_) { stage.scrollIntoView(true); }
   }
-  flyTo({ id, kt, win: [0, t1] });
+  flyTo(plan);
 }
 
 let searchTimer = null;

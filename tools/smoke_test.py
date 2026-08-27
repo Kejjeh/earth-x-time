@@ -438,6 +438,128 @@ def run(url, headed, report):
                      f"selection={page.evaluate('S.selection')!r} resolver={page.evaluate('S.resolver')!r}")
         report.check("a hostile hash raises no errors", not page_errors, " | ".join(page_errors[:2]))
 
+        # ------------------------------- 9. a link to something not known yet
+        # readHash validates s= against R.referents, which is right as far as it
+        # goes - but nothing checked the referent could be RESOLVED at the
+        # knowledge-time the same hash sets, so the panel fell through to
+        # "Nothing selected" with the selection still set and still in the URL.
+        page.goto("about:blank")
+        page.goto(url.split("#")[0] + "#k=1700&s=homo_sapiens", wait_until="load", timeout=45000)
+        page.wait_for_timeout(1200)
+        notyet = page.evaluate("""() => {
+          const t = (document.getElementById('detail').innerText || '').trim().toUpperCase();
+          return { sel: S.selection, kt: S.kt,
+                   resolvable: !!facts().items[S.selection],
+                   emptyState: t.startsWith('NOTHING SELECTED'),
+                   namesIt: t.includes('HOMO SAPIENS'),
+                   saysYear: t.includes('1700') };
+        }""")
+        report.check("a link to something not known yet explains itself",
+                     notyet["sel"] == "homo_sapiens" and not notyet["resolvable"]
+                     and not notyet["emptyState"] and notyet["namesIt"] and notyet["saysYear"],
+                     json.dumps(notyet))
+
+        # ------------------------ 10. a hop inside the panel lands in the open
+        # chooseResult clears a conflicting focus, re-enables the subject and
+        # advances knowledge-time before selecting. The panel's own Connections
+        # links did none of it, so a hop selected a referent with no mark on the
+        # globe or the timeline and rendered a full panel for it anyway.
+        page.goto("about:blank")
+        page.goto(url.split("#")[0], wait_until="load", timeout=45000)
+        page.wait_for_timeout(1400)
+        case = page.evaluate("""() => {
+          for (const sub of SUBJECTS) {
+            S.subjects = new Set([sub]); S.focus = null; setKt(2026);
+            S.selection = null; invalidate();
+            const F = facts();
+            for (const ed of F.allEdges) {
+              const a = F.items[ed.edge.source], b = F.items[ed.edge.target];
+              if (!a || !b) continue;
+              if (a.subjectOn && !b.subjectOn) return { sub, from: ed.edge.source, to: ed.edge.target };
+              if (b.subjectOn && !a.subjectOn) return { sub, from: ed.edge.target, to: ed.edge.source };
+            }
+          }
+          return null;
+        }""")
+        if report.check("there is a filter-hidden neighbour to hop to", case is not None,
+                        json.dumps(case)):
+            page.evaluate("""(c) => {
+              S.subjects = new Set([c.sub]); S.focus = null; setKt(2026);
+              setSelection(c.from); renderNow();
+            }""", case)
+            page.wait_for_timeout(300)
+            hopped = page.evaluate("""(c) => {
+              const b = document.querySelector('#detail [data-goto="' + c.to + '"]');
+              if (!b) return { clicked: false };
+              b.click();
+              return { clicked: true };
+            }""", case)
+            page.wait_for_timeout(1500)
+            landed = page.evaluate("""() => {
+              const it = facts().items[S.selection];
+              return { sel: S.selection, visible: !!(it && it.visible),
+                       onScreen: HIT.some(h => h.id === S.selection)
+                              || CHIT.some(h => h.id === S.selection) };
+            }""")
+            report.check("a hop inside the panel lands on something you can see",
+                         hopped["clicked"] and landed["sel"] == case["to"]
+                         and landed["visible"] and landed["onScreen"],
+                         json.dumps(landed))
+
+        # --------------- 11. revealing something already in view keeps the view
+        # chooseResult widened to [0, oldest*1.7] unconditionally, throwing away
+        # a window someone had panned to in order to reveal a thing that was
+        # never hidden.
+        kept = page.evaluate("""() => {
+          setKt(2026); S.subjects = new Set(SUBJECTS); S.focus = null;
+          setWindow(0, 1.0e8); renderNow();
+          const before = [Math.round(S.win.t0), Math.round(S.win.t1)];
+          const r = resolve('kpg_extinction', S.kt, S.resolver);
+          const inside = r.oldest <= S.win.t1 && r.youngest >= S.win.t0;
+          chooseResult('kpg_extinction');
+          return { before, inside,
+                   to: TW ? [Math.round(TW.to.t0), Math.round(TW.to.t1)] : before };
+        }""")
+        report.check("revealing something already on screen keeps the window",
+                     kept["inside"] and kept["to"] == kept["before"], json.dumps(kept))
+
+        # ------------------------- 12. Compare eras is as modal as it says it is
+        page.evaluate("TW = null; S.selection = null; changed(); renderNow();")
+        page.wait_for_timeout(200)
+        page.click("#btn-diff")
+        page.wait_for_timeout(400)
+        modal = page.evaluate("""() => ({
+          focusInside: document.getElementById('diffwrap').contains(document.activeElement),
+          appInert: document.querySelector('.app').hasAttribute('inert')
+        })""")
+        for _ in range(10):
+            page.keyboard.press("Tab")
+        modal["stillInside"] = page.evaluate(
+            "document.getElementById('diffwrap').contains(document.activeElement)")
+        report.check("Compare eras keeps focus in the dialog it declares modal",
+                     modal["focusInside"] and modal["appInert"] and modal["stillInside"],
+                     json.dumps(modal))
+
+        # ---------------------------- 13. the year inputs stay on the rail
+        # `+value || 1975` accepted 9, 3000 and -5 into S.ktA and drove resolve()
+        # and the dialog title with them; and 0 is falsy, so the first character
+        # of "2000" silently jumped the comparison to 1975.
+        years = []
+        for typed in ("9", "0", "3000", "-5"):
+            page.fill("#diff-a", typed)
+            page.wait_for_timeout(220)
+            years.append(page.evaluate("S.ktA"))
+        report.check("the compare-eras years stay on the knowledge rail",
+                     all(1650 <= y <= 2026 for y in years), json.dumps(years))
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(250)
+        report.check("Escape gives focus back to the button that opened it",
+                     page.evaluate("document.activeElement.id") == "btn-diff",
+                     page.evaluate("document.activeElement.id || document.activeElement.tagName"))
+
+        report.check("no page errors across the whole desktop run", not page_errors,
+                     " | ".join(page_errors[:2]))
+
         browser.close()
 
 

@@ -132,13 +132,16 @@ rotate the globe, does a pinch zoom it, does a cancelled pinch strand the
 gesture, does the K–Pg link still appear in 1980 and harden in 1991, does a
 shared URL restore the view, can a hostile hash poison it, is a marker only as
 clickable as it is big, do the rival markers agree with the band they sit in, and
-does toggling the basemap reach the URL.
+does toggling the basemap reach the URL, does a link to something not yet known
+explain itself rather than reading as empty, does a hop inside the panel land on
+something that is actually drawn, does revealing something already on screen
+leave the window alone, and is `Compare eras` as modal as it declares itself.
 
 Then it opens a second context at 390x844 with real touch and asks the phone
 build the questions the desktop one cannot: can a finger reach every control on
 the stage, does tapping a marker put its panel where you can see it, does
 choosing a search result fly a globe that is on screen, is the globe's focus
-ring inside its own clipping box. 51 checks, wired into `build.py`, exits
+ring inside its own clipping box. 59 checks, wired into `build.py`, exits
 non-zero.
 
 It exists because this project lost an entire build to a boot failure that
@@ -195,16 +198,19 @@ and live by 1985. It exits non-zero on any of those.
   endpoint is a referent that does not exist yet. They render in the panel and
   say nothing to the graph.
 - **Not React.** See below.
-- **A UX review found twelve items; item 1 and the globe half of item 10 are
-  done, the rest are not.** The phone blockers are fixed — the stage control
+- **A UX review found twelve items; items 1 and 4 and both halves of item 10
+  that concern this site are done, the rest are not.** The phone blockers are fixed — the stage control
   strip no longer runs off the left edge (`Guided path` was entirely off-screen,
   and it is the tour's only entry point), a tap on a marker now scrolls its
   panel into view, a chosen search result no longer flies a globe that is above
   the viewport, and the globe's focus ring is painted inside its own clipping
   box instead of being clipped away. All four are asserted by the phone section
-  of the smoke test. Still open: the scroll-versus-rotate conflict on touch,
-  light-mode contrast on the stage overlays, `goTo()` bypassing `chooseResult`'s
-  gating, and the rest. See [`docs/ux-review-2026-08-03.md`](docs/ux-review-2026-08-03.md),
+  of the smoke test. A hop inside the panel now goes through the same gate
+  `chooseResult` does — and that gate no longer throws away a window someone
+  panned to in order to reveal something already inside it — and `Compare eras`
+  now makes the rest of the page `inert` instead of only claiming to. Still
+  open: the scroll-versus-rotate conflict on touch, light-mode contrast on the
+  stage overlays, and the rest. See [`docs/ux-review-2026-08-03.md`](docs/ux-review-2026-08-03.md),
   which covers this site and its sibling together.
 
 ## Two deliberate departures

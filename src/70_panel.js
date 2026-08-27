@@ -60,6 +60,44 @@ function edgeLink(ed, dir) {
 
 function renderDetail() {
   const F = facts();
+
+  /* A real referent that resolve() cannot place at this knowledge-time. Reached
+     by a shared link - #k=1700&s=homo_sapiens - and it used to fall through to
+     "Nothing selected" while the selection was set and still in the URL. That is
+     not an error state: it is the most interesting thing the page has to say,
+     and resolve() has already worked out the year it changes. */
+  if (S.selection && !F.items[S.selection] &&
+      Object.prototype.hasOwnProperty.call(R.referents, S.selection)) {
+    const ref = R.referents[S.selection];
+    const first = firstDatedYear(S.selection);
+    const pending = (R.byRef[S.selection] || [])
+      .filter(c => c.knowledge_time > S.kt)
+      .sort((a, b) => a.knowledge_time - b.knowledge_time);
+    elDetail.innerHTML = `
+      <div class="dt-head">
+        <div class="dt-kind"><span class="tag">${esc(ref.kind)}</span></div>
+        <h2>${esc(ref.label)}</h2>
+      </div>
+      <div class="resolved">
+        <span class="lbl" style="display:block;margin-bottom:4px">Not yet known in ${S.kt}</span>
+        <div class="big">no dated claim</div>
+        <p class="prov">Nothing datable has been asserted about this in
+        <b class="num">${S.kt}</b>. The page is not hiding it — in this year, nobody
+        had put a number on it.</p>
+        ${isFinite(first) ? `<p class="prov"><button class="edge-link" data-goto="${esc(ref.id)}"
+          style="padding:2px 0"><span><span class="who">Go to ${first}</span>
+          <span class="mech">the year the first dated claim arrives</span></span></button></p>` : ''}
+      </div>
+      ${pending.length ? `<div class="sect">
+        <span class="lbl">What is still to come · ${pending.length}</span>
+        ${pending.slice(0, 8).map(c => `<div class="claim pending" style="--cl:var(--rule)">
+          <p class="stmt">${esc(c.statement)}</p>
+          <p class="src">${esc(c.asserted_by)} — arrives in <span class="kt num">${c.knowledge_time}</span></p>
+        </div>`).join('')}
+      </div>` : ''}`;
+    return;
+  }
+
   if (!S.selection || !F.items[S.selection]) {
     const disp = F.visible.filter(i => i.res.disputed)
       .sort((a, b) => (b.res.oldest - b.res.youngest) - (a.res.oldest - a.res.youngest))
