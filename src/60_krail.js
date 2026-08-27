@@ -69,8 +69,11 @@ function drawKrail() {
   kx.beginPath(); kx.moveTo(spine + 0.5, KPAD); kx.lineTo(spine + 0.5, KH - KPAD); kx.stroke();
 
   // ticks
+  // The first round fifty at or after KT_MIN. Starting at a literal 1650 drew
+  // every tick below the floor outside the canvas - ktToY(1650) is 827px in a
+  // 737px rail once KT_MIN moves up.
   kx.font = '400 9px xt-mono, monospace';
-  for (let yr = 1650; yr <= KT_MAX; yr += 50) {
+  for (let yr = Math.ceil(KT_MIN / 50) * 50; yr <= KT_MAX; yr += 50) {
     const py = ktToY(yr);
     kx.strokeStyle = withAlpha(CSSV['chalk-faint'], 0.45);
     kx.beginPath(); kx.moveTo(spine + 0.5, py); kx.lineTo(spine + 5, py); kx.stroke();
@@ -87,17 +90,24 @@ function drawKrail() {
 }
 
 /* ----------------------------------------------------------------- replay */
+/* Sixteen seconds from one end of the rail to the other. The span used to be
+   measured from a literal 1650 rather than from KT_MIN, so with the floor
+   anywhere above that the first seconds of a replay produced values setKt
+   clamped away - the rail sat still - and the rest ran at a rate computed for a
+   longer rail than the one on screen. startReplay looked right only because
+   setKt clamped for it, which is a second mechanism covering for this one. */
 let playT = 0;
+const REPLAY_SECONDS = 16;
 function tickReplay(dt) {
   if (!S.playing) return;
   playT += dt;
-  const span = KT_MAX - 1650;
-  const next = Math.round(1650 + (playT / 16) * span);
+  const span = KT_MAX - KT_MIN;
+  const next = Math.round(KT_MIN + (playT / REPLAY_SECONDS) * span);
   if (next >= KT_MAX) { setKt(KT_MAX); stopReplay(); return; }
   setKt(next);
 }
 function startReplay() {
-  S.playing = true; playT = 0; setKt(1650);
+  S.playing = true; playT = 0; setKt(KT_MIN);
   document.getElementById('btn-play').setAttribute('aria-pressed', 'true');
   document.getElementById('btn-play').textContent = 'Stop';
 }
