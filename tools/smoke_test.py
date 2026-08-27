@@ -602,6 +602,85 @@ def run(url, headed, report):
                      and rail["nowLabel"] == str(PY_MAX) and rail["diffMax"] == PY_MAX,
                      f"python {PY_MIN}..{PY_MAX}   page {json.dumps(rail)}")
 
+        # ------- 16. the chips count the marks they account for, and only those
+        # subjectCounts was tallied before the window, the zoom band and the
+        # roll-up had been applied, so it moved with knowledge-time and nothing
+        # else: zoomed to the Holocene the astronomy chip still read 11 with no
+        # astronomy drawn anywhere.
+        chips = page.evaluate("""() => {
+          const out = [];
+          const views = [
+            { name: 'all 4.6 Ga',        win: [0, 4.6e9],  kt: KT_MAX },
+            { name: 'last 60,000 years', win: [0, 60000],  kt: KT_MAX },
+            { name: 'since the dinosaurs', win: [0, 7.0e7], kt: KT_MAX },
+            { name: 'knowledge-time 1800', win: [0, 4.6e9], kt: 1800 }
+          ];
+          for (const v of views) {
+            S.subjects = new Set(SUBJECTS); S.focus = null; S.selection = null;
+            setKt(v.kt); setWindow(v.win[0], v.win[1]); renderNow();
+            const F = facts();
+            const drawn = {};
+            for (const s of SUBJECTS) drawn[s] = 0;
+            for (const it of F.visible)
+              for (const s of it.res.subjects) if (s in drawn) drawn[s]++;
+            const chip = {};
+            for (const b of document.querySelectorAll('#subjects .sub'))
+              chip[b.dataset.sub] = +b.querySelector('.cnt').textContent;
+            const bad = SUBJECTS.filter(s => chip[s] !== drawn[s]);
+            if (bad.length) out.push({ view: v.name, bad, chip, drawn });
+          }
+          return out;
+        }""")
+        report.check("every subject chip counts the marks it accounts for",
+                     chips == [], json.dumps(chips)[:240])
+
+        # ---------------- 17. Replay sweeps the rail the page actually has
+        # The span was measured from a literal 1650 rather than KT_MIN, so with
+        # the floor anywhere above that the opening seconds produced values
+        # setKt clamped away - the rail sat still - and the rest ran at a rate
+        # computed for a longer rail than the one on screen.
+        replay = page.evaluate("""() => {
+          startReplay();
+          const start = S.kt;
+          tickReplay(0.5);            // half a second in, it must already move
+          const early = S.kt;
+          for (let i = 0; i < 40; i++) tickReplay(0.5);
+          const end = S.kt;
+          stopReplay(); setKt(KT_MAX);
+          return { start, early, end, min: KT_MIN, max: KT_MAX, playing: S.playing };
+        }""")
+        report.check("Replay sweeps from the floor of the rail to its ceiling",
+                     replay["start"] == replay["min"]
+                     and replay["early"] > replay["start"]
+                     and replay["end"] == replay["max"]
+                     and replay["playing"] is False,
+                     json.dumps(replay))
+
+        # Read back what drawKrail actually paints, rather than recomputing the
+        # loop bounds here - a check that restates the code it is checking
+        # cannot fail. The tick loop started at a literal 1650, so every tick
+        # below the floor was painted outside the canvas: ktToY(1650) is 827px
+        # in a 737px rail once KT_MIN moves up.
+        rail_ticks = page.evaluate("""() => {
+          const ctx = document.getElementById('krailcv').getContext('2d');
+          const real = ctx.fillText.bind(ctx);
+          const seen = [];
+          ctx.fillText = function (t, x, y) { seen.push({ t, y }); return real(t, x, y); };
+          needKrail = true; drawKrail();
+          ctx.fillText = real;
+          const years = seen.filter(s => /^\\d{4}$/.test(s.t));
+          return {
+            KT_MIN, KT_MAX, height: KH, pad: KPAD, count: years.length,
+            outsideRange: years.filter(s => +s.t < KT_MIN || +s.t > KT_MAX).map(s => s.t),
+            outsideCanvas: years.filter(s => s.y < 0 || s.y > KH).map(s => `${s.t}@${Math.round(s.y)}`)
+          };
+        }""")
+        report.check("every rail tick is a year on the rail, drawn inside it",
+                     rail_ticks["count"] > 2
+                     and rail_ticks["outsideRange"] == []
+                     and rail_ticks["outsideCanvas"] == [],
+                     json.dumps(rail_ticks))
+
         report.check("no page errors across the whole desktop run", not page_errors,
                      " | ".join(page_errors[:2]))
 

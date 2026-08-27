@@ -150,8 +150,10 @@ Then it loads the page once more in each theme and measures the contrast of
 every small explanatory string against its real background — photographing the
 painted pixels behind the stage overlays, because a computed `background-color`
 cannot see the gradient they sit on. And it asks the page where the knowledge
-rail ends, and compares that with what the Python tools read. 70 checks, wired
-into `build.py`, exits non-zero.
+rail ends, and compares that with what the Python tools read, whether every
+subject chip counts exactly the marks it accounts for, and whether Replay
+sweeps the rail the page actually has. 73 checks, wired into `build.py`, exits
+non-zero.
 
 It exists because this project lost an entire build to a boot failure that
 nothing detected: a legend swatch read the wrong palette key, `undefined` reached

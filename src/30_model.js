@@ -146,8 +146,6 @@ function queryFacts(A) {
     const subjectOn = res.subjects.some(s => A.subjects.has(s));
     const zoomOK = z >= res.zoomMin - 0.001 || res.significance >= 5 || A.selection === id;
 
-    for (const s of res.subjects) if (s in subjectCounts) subjectCounts[s]++;
-
     items[id] = {
       id, ref: R.referents[id], res,
       inWindow: overlaps,
@@ -234,6 +232,20 @@ function queryFacts(A) {
   }
 
   const visible = order.map(i => items[i]).filter(i => i.visible);
+
+  /* The chip counts come off `visible` itself, and nothing else. They used to be
+     tallied at the top of this function, before the window, the zoom band and
+     the roll-up had been applied to anything, so they moved with knowledge-time
+     and nothing else: zoomed to the Holocene the astronomy chip still read 11
+     with no astronomy on screen at all. Counting a set the renderers do not draw
+     is the second filtering path this function exists to avoid - so the number
+     on a chip is now, by construction, the number of marks it accounts for.
+     A switched-off subject reads 0, which is what the screen shows; the chip is
+     already drawn as off, so the state is not carried by the number. */
+  for (const it of visible) {
+    for (const s of it.res.subjects) if (s in subjectCounts) subjectCounts[s]++;
+  }
+
   const liveEdges = edges.filter(e =>
     e.from.visible && e.to.visible &&
     (!A.focus || e.from.inFocus || e.to.inFocus));
