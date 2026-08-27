@@ -441,6 +441,113 @@ def run(url, headed, report):
         browser.close()
 
 
+def run_mobile(url, headed, report):
+    """The phone build, from outside, at 390x844 with real touch.
+
+    Everything above runs at 1440x900, which is exactly the width at which the
+    phone layout's blockers are invisible: the stage control strip only grows
+    off the left edge once the stage is narrow, and the detail panel is only
+    a thousand pixels below the fold once .instrument is in grid row 3.
+    """
+    from playwright.sync_api import sync_playwright
+
+    print("\n  -- phone, 390x844, touch --", flush=True)
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=not headed)
+        ctx = browser.new_context(viewport={"width": 390, "height": 844},
+                                  device_scale_factor=2, has_touch=True, is_mobile=True)
+        page = ctx.new_page()
+        page_errors = []
+        page.on("pageerror", lambda e: page_errors.append(str(e)))
+        page.goto(url, wait_until="load", timeout=45000)
+        page.wait_for_timeout(1600)
+        report.check("the phone build boots", page.evaluate("window.__BOOT_OK") is True,
+                     str(page.evaluate("window.__BOOT_ERR"))[:120])
+
+        # ------------- every stage control can actually be reached by a finger
+        # .stage-tr was shrink-to-fit anchored right inside an overflow:hidden
+        # stage, so it grew off the LEFT edge: at 390px "Guided path" spanned
+        # -64 to -1, and #btn-tour is the tour's only entry point - S.tour is
+        # not in the hash and there is no keyboard binding.
+        unreachable = page.evaluate("""() => {
+          const strip = document.querySelector('.stage-tr');
+          const bad = [];
+          for (const b of strip.querySelectorAll('.iconbtn')) {
+            // scroll the strip to the button the way a finger would, then ask
+            // the document what is actually on top of its centre.
+            b.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            const r = b.getBoundingClientRect();
+            const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+            if (!(el === b || b.contains(el))) {
+              bad.push({ t: b.textContent.trim(), l: Math.round(r.left), r: Math.round(r.right) });
+            }
+          }
+          strip.scrollLeft = 0;
+          return bad;
+        }""")
+        report.check("every stage control is reachable on a phone",
+                     unreachable == [], json.dumps(unreachable)[:200])
+
+        # ----------------------------------- a tap on a marker shows something
+        # The detail panel is grid row 3 under a 46vh stage - measured at
+        # detailTop 1169 in an 870px viewport - and the tooltip never fires on
+        # touch, so the tap changed nothing the tapper could see.
+        page.evaluate("scrollTo(0, 0); S.selection = null; markAll(); renderNow();")
+        page.wait_for_timeout(250)
+        pick = page.evaluate("""() => {
+          let best = null, bd = 1e18;
+          for (const h of HIT) {
+            if (!h.id) continue;
+            const dx = h.x - GW / 2, dy = h.y - GH / 2, d = dx * dx + dy * dy;
+            if (d < bd && h.x > 40 && h.y > 70 && h.x < GW - 40 && h.y < GH - 40) { bd = d; best = h; }
+          }
+          const r = document.getElementById('globe').getBoundingClientRect();
+          return best ? { x: r.left + best.x, y: r.top + best.y, id: best.id } : null;
+        }""")
+        if report.check("the phone globe has a marker to tap", pick is not None):
+            page.touchscreen.tap(pick["x"], pick["y"])
+            page.wait_for_timeout(900)
+            after = page.evaluate("""() => {
+              const r = document.getElementById('detail').getBoundingClientRect();
+              return { sel: S.selection, top: Math.round(r.top), vh: innerHeight };
+            }""")
+            report.check("tapping a marker brings its panel into view",
+                         after["sel"] is not None and after["top"] < after["vh"] - 40,
+                         json.dumps(after))
+
+        # ------------------ choosing a search result flies something in view
+        page.evaluate("scrollTo(0, document.body.scrollHeight)")
+        page.wait_for_timeout(250)
+        page.fill("#search", "iridium")
+        page.wait_for_timeout(300)
+        page.press("#search", "Enter")
+        page.wait_for_timeout(1200)
+        flew = page.evaluate("""() => ({
+          sel: S.selection,
+          stageTop: Math.round(document.getElementById('stage').getBoundingClientRect().top)
+        })""")
+        report.check("choosing a search result flies a globe you can see",
+                     flew["sel"] is not None and flew["stageTop"] > -40, json.dumps(flew))
+
+        # ------------------------------------------- the globe's focus ring
+        # #globe is exactly .stage, and .stage is overflow:hidden, so an
+        # outline painted 2px outside the border box is clipped entirely.
+        ring = page.evaluate("""() => {
+          const g = document.getElementById('globe');
+          g.focus();
+          const cs = getComputedStyle(g);
+          return { outlineWidth: cs.outlineWidth, offset: cs.outlineOffset, shadow: cs.boxShadow };
+        }""")
+        report.check("the globe's focus ring is painted inside its own box",
+                     "inset" in (ring["shadow"] or "")
+                     or (ring["offset"] or "").startswith("-"),
+                     json.dumps(ring)[:140])
+
+        report.check("no page errors on the phone build", not page_errors,
+                     " | ".join(page_errors[:2]))
+        browser.close()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--url", default=None, help="test a deployed URL instead of the local build")
@@ -461,6 +568,7 @@ def main():
     report = Report()
     try:
         run(url, a.headed, report)
+        run_mobile(url, a.headed, report)
     finally:
         if httpd:
             httpd.shutdown()

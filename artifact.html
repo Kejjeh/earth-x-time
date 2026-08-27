@@ -327,6 +327,11 @@ button { background: none; border: none; cursor: pointer; padding: 0; }
 
 /* ============================================================ STAGE */
 #globe { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+/* The globe is exactly the size of .stage, and .stage is overflow:hidden, so the
+   shared :focus-visible ring — painted 2px OUTSIDE the border box — is clipped
+   away completely. On a role="application" element that swallows the arrow keys,
+   that leaves a keyboard user with no sign of where focus is. Paint it inside. */
+#globe:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--cyanotype); }
 #globe.dragging { cursor: grabbing; }
 .stage-tl { position: absolute; top: 12px; left: 14px; pointer-events: none; max-width: 60%; }
 .as-of {
@@ -435,6 +440,17 @@ button { background: none; border: none; cursor: pointer; padding: 0; }
 }
 @media (max-width: 860px) {
   body { overflow: auto; }
+  /* The strip is shrink-to-fit anchored right, inside an overflow:hidden stage,
+     so as the stage narrows it grows off the LEFT edge and is clipped: at 390px
+     "Guided path" spans -64 to -1, and #btn-tour is the only entry point the
+     tour has. Span the stage and scroll instead — and start at flex-start, not
+     flex-end, because content overflowing the START edge of a flex scroll
+     container cannot be scrolled to in Chromium or WebKit. */
+  .stage-tr { left: 12px; right: 12px; justify-content: flex-start;
+    overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+  .stage-tr::-webkit-scrollbar { display: none; }
+  .stage-tr .iconbtn { white-space: nowrap; flex: none; }
+  .stage-tl { top: 52px; }          /* the strip now owns the top line */
   .app { grid-template-columns: minmax(0,1fr) var(--rail-w); grid-template-rows: 46vh auto auto; height: auto; min-height: 100vh; min-height: 100dvh; }
   .stage { grid-column: 1; grid-row: 1; }
   .krail { grid-column: 2; grid-row: 1 / span 2; }
@@ -2546,9 +2562,18 @@ function chooseResult(id) {
   const t1 = res && isFinite(res.oldest)
     ? Math.max(2000, Math.min(T_MAX, res.oldest * 1.7))
     : S.win.t1;
-  flyTo({ id, kt, win: [0, t1] });
   closeResults();
   elSearch.blur();
+  /* On a phone the search box is in grid row 3 and the globe is row 1, so
+     choosing a result tweened the globe for 1.1s about 400px above the viewport.
+     Bring the stage back first. A no-op on desktop, where the body does not
+     scroll and the stage is always at the top. */
+  const stage = document.getElementById('stage');
+  if (stage && stage.getBoundingClientRect().top < 0) {
+    try { stage.scrollIntoView({ block: 'start', behavior: RM.matches ? 'auto' : 'smooth' }); }
+    catch (_) { stage.scrollIntoView(true); }
+  }
+  flyTo({ id, kt, win: [0, t1] });
 }
 
 let searchTimer = null;
@@ -2778,7 +2803,23 @@ function setWindow(t0, t1) {
   S.win.t0 = a; S.win.t1 = b;
   changed();
 }
-function setSelection(id) { S.selection = id; changed(); }
+/* Where the selection came from is an argument, not something to infer. Under a
+   coarse pointer the detail panel is in grid row 3, roughly 1170px below a 46vh
+   stage, and the tooltip never fires on touch — it lives after the drag branch
+   returns — so a tap on a marker changes nothing the tapper can see. Only a
+   selection made ON a canvas scrolls the panel up: Escape passes null, a
+   data-goto hop is already inside the panel, and the guided path is driving the
+   stage itself. */
+const COARSE = matchMedia('(pointer:coarse)');
+function setSelection(id, opts) {
+  S.selection = id;
+  changed();
+  if (id && opts && opts.fromCanvas && COARSE.matches && elDetail) {
+    try {
+      elDetail.scrollIntoView({ block: 'start', behavior: RM.matches ? 'auto' : 'smooth' });
+    } catch (_) { elDetail.scrollIntoView(true); }
+  }
+}
 
 /* ------------------------------------------------------------------- globe */
 let gDrag = null, gMoved = 0;
@@ -2913,7 +2954,7 @@ function endGlobeDrag(e) {
       const d = Math.hypot(h.x - mx, h.y - my);
       if (d < h.r && d < bd) { bd = d; best = h; }
     }
-    setSelection(best ? best.id : null);
+    setSelection(best ? best.id : null, { fromCanvas: true });
   }
 }
 /* Lifting a finger mid-pinch must not end the gesture, and must not be read as a
@@ -3021,7 +3062,8 @@ ccv.addEventListener('pointermove', e => {
 });
 
 ccv.addEventListener('pointerup', e => {
-  if (cDrag && cDrag.mode === 'click') setSelection(cDrag.id === S.selection ? null : cDrag.id);
+  if (cDrag && cDrag.mode === 'click')
+    setSelection(cDrag.id === S.selection ? null : cDrag.id, { fromCanvas: true });
   else if (cDrag && cDrag.mode === 'pan' && cDrag.moved < 2) {
     const sc = SCALE || chronScale();
     S.cursor = Math.max(0, Math.min(T_MAX, sc.t(chronPos(e).x)));

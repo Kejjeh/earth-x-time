@@ -114,9 +114,18 @@ function chooseResult(id) {
   const t1 = res && isFinite(res.oldest)
     ? Math.max(2000, Math.min(T_MAX, res.oldest * 1.7))
     : S.win.t1;
-  flyTo({ id, kt, win: [0, t1] });
   closeResults();
   elSearch.blur();
+  /* On a phone the search box is in grid row 3 and the globe is row 1, so
+     choosing a result tweened the globe for 1.1s about 400px above the viewport.
+     Bring the stage back first. A no-op on desktop, where the body does not
+     scroll and the stage is always at the top. */
+  const stage = document.getElementById('stage');
+  if (stage && stage.getBoundingClientRect().top < 0) {
+    try { stage.scrollIntoView({ block: 'start', behavior: RM.matches ? 'auto' : 'smooth' }); }
+    catch (_) { stage.scrollIntoView(true); }
+  }
+  flyTo({ id, kt, win: [0, t1] });
 }
 
 let searchTimer = null;
