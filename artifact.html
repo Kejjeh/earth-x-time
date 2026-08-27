@@ -20,7 +20,13 @@
   --shale-3:    #1E3742;
   --chalk:      #DDE7E7;
   --chalk-dim:  #90A5AB;
-  --chalk-faint:#5D7178;
+  /* chalk-faint is the colour of every small string that explains what the axes
+     are: the group labels, the presets, the resolver note, the search note, the
+     empty panel. At 9.5-12px none of them is large text, so none gets the 3:1
+     exemption and all of them need 4.5:1. It used to sit at 3.32:1 here and
+     2.98:1 in light mode - where it got LIGHTER, which is backwards. Both values
+     now clear 4.5:1 against the worst surface they land on, --shale-2. */
+  --chalk-faint:#86959A;
   --cyanotype:  #55A0C6;
   --cyanotype-d:#2C6D91;
   --ochre:      #D08A44;
@@ -58,7 +64,7 @@
     --shale-3:    #D6DFDE;
     --chalk:      #101D23;
     --chalk-dim:  #4E656D;
-    --chalk-faint:#7C9198;
+    --chalk-faint:#58676C;
     --cyanotype:  #2A6D91;
     --cyanotype-d:#1B4E69;
     --ochre:      #A2622A;
@@ -84,7 +90,7 @@
 /* The viewer's explicit toggle must win over the media query in BOTH directions. */
 :root[data-theme="dark"] {
   --abyss:#0A1317; --shale:#101E25; --shale-2:#162A33; --shale-3:#1E3742;
-  --chalk:#DDE7E7; --chalk-dim:#90A5AB; --chalk-faint:#5D7178;
+  --chalk:#DDE7E7; --chalk-dim:#90A5AB; --chalk-faint:#86959A;
   --cyanotype:#55A0C6; --cyanotype-d:#2C6D91; --ochre:#D08A44;
   --rule:rgba(146,180,190,0.16); --rule-soft:rgba(146,180,190,0.08);
   --sheen:rgba(255,255,255,0.04);
@@ -96,7 +102,7 @@
 }
 :root[data-theme="light"] {
   --abyss:#E6EBE9; --shale:#F1F4F2; --shale-2:#E4EAE9; --shale-3:#D6DFDE;
-  --chalk:#101D23; --chalk-dim:#4E656D; --chalk-faint:#7C9198;
+  --chalk:#101D23; --chalk-dim:#4E656D; --chalk-faint:#58676C;
   --cyanotype:#2A6D91; --cyanotype-d:#1B4E69; --ochre:#A2622A;
   --rule:rgba(20,50,62,0.20); --rule-soft:rgba(20,50,62,0.09);
   --sheen:rgba(10,30,40,0.03);
@@ -333,13 +339,22 @@ button { background: none; border: none; cursor: pointer; padding: 0; }
    that leaves a keyboard user with no sign of where focus is. Paint it inside. */
 #globe:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--cyanotype); }
 #globe.dragging { cursor: grabbing; }
+/* The stage's own background does not follow the theme: .stage.space is a fixed
+   dark gradient with satellite imagery over it. The text on top did follow the
+   theme, so in light mode a dark token landed on a near-black stage - #epistemic
+   measured 3.25:1 there, and .as-of and the legend 2.74:1 over the chart ground.
+   No single theme-independent colour fixes both, because the backdrop is dark
+   regardless under imagery and theme-following under Chart. The discriminator is
+   the basemap, and .stage.space is already toggled with it. */
+.stage.space { --stage-fg: #C6D4D9; --stage-fg-dim: #A3B5BB; }
+.stage       { --stage-fg: var(--chalk-dim); --stage-fg-dim: var(--chalk-dim); }
 .stage-tl { position: absolute; top: 12px; left: 14px; pointer-events: none; max-width: 60%; }
 .as-of {
   font-family: var(--font-display); text-transform: uppercase; letter-spacing: .14em;
-  font-size: 10px; color: var(--chalk-faint);
+  font-size: 10px; color: var(--stage-fg-dim);
 }
 .as-of b { color: var(--cyanotype); font-family: var(--font-data); letter-spacing: 0; font-size: 12px; }
-.epistemic { margin: 4px 0 0; font-size: 12px; color: var(--chalk-dim); line-height: 1.5;
+.epistemic { margin: 4px 0 0; font-size: 12px; color: var(--stage-fg); line-height: 1.5;
   max-width: 52ch; text-wrap: balance; }
 .stage-tr { position: absolute; top: 10px; right: 12px; display: flex; gap: 6px; }
 .iconbtn {
@@ -352,7 +367,7 @@ button { background: none; border: none; cursor: pointer; padding: 0; }
 .iconbtn[aria-pressed="true"] { background: var(--shale-3); color: var(--cyanotype); border-color: var(--cyanotype-d); }
 .stage-bl { position: absolute; left: 14px; bottom: 12px; pointer-events: none; }
 .legend { display: flex; flex-direction: column; gap: 3px; }
-.legend div { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--chalk-faint); }
+.legend div { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--stage-fg-dim); }
 .legend .g { width: 22px; height: 9px; flex: none; }
 
 .tip {
