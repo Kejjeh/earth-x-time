@@ -3636,6 +3636,22 @@ document.addEventListener('visibilitychange', () => {
 /* ------------------------------------------------------------------- start */
 function boot() {
   readPalette();
+  /* Six places in the markup spelled the rail's ceiling out as a literal, and
+     the constant has already moved once - src/20_core.js says next to it "Move
+     this when the record moves past it", and two of the Python tools were left
+     behind on 2025 when it did. Nothing here restates it: the button's label,
+     the slider's advertised range and the two Compare-eras inputs all come from
+     KT_MIN and KT_MAX, so the next move is one edit. */
+  document.getElementById('btn-now').textContent = String(KT_MAX);
+  document.getElementById('btn-now').setAttribute(
+    'aria-label', `Jump knowledge-time to ${KT_MAX}`);
+  kcv.setAttribute('aria-valuemin', String(KT_MIN));
+  kcv.setAttribute('aria-valuemax', String(KT_MAX));
+  for (const el of [diffA, diffB]) {
+    el.min = String(KT_MIN);
+    el.max = String(KT_MAX);
+  }
+  diffB.value = String(KT_MAX);
   readHash();                     // a shared view wins over the defaults...
   syncControls();                 // ...and the controls have to say so
   resizeGlobe(); resizeChron(); resizeKrail();

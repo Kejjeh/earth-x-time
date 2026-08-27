@@ -25,6 +25,8 @@ import json, os, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
+sys.path.insert(0, HERE)
+from knowledge_time import KT_MIN, KT_MAX  # noqa: E402
 GRAPH = os.path.join(ROOT, "src", "graph.json")
 
 SUBJECTS = {"geology", "biology", "evolution", "chemistry", "human_history", "astronomy"}
@@ -97,7 +99,18 @@ def main():
             err(f"claim {c['id']} earth_time_start {ts!r} is not a sane years-before-present")
         if isinstance(ts, (int, float)) and isinstance(te, (int, float)) and te > ts:
             err(f"claim {c['id']} ends ({te}) before it starts ({ts}) in years-before-present")
+        # knowledge_time was read but never checked: a missing one made `k < kt`
+        # raise TypeError and killed the run with a traceback carrying no claim
+        # id, and a knowledge_time of 3024 passed cleanly - a claim no position
+        # of the rail can ever reach, which is the same "invisible, so it looks
+        # like a bug" this script already refuses for referents.
         kt = c.get("knowledge_time")
+        if not isinstance(kt, (int, float)):
+            err(f"claim {c['id']} has no knowledge_time")
+            kt = None
+        elif not (KT_MIN <= kt <= KT_MAX):
+            err(f"claim {c['id']} knowledge_time {kt} is outside the rail "
+                f"[{KT_MIN},{KT_MAX}] — it could never be reached")
         tl = c.get("status_timeline") or []
         if not tl:
             err(f"claim {c['id']} has no status_timeline")
@@ -109,7 +122,7 @@ def main():
             if not isinstance(k, (int, float)):
                 err(f"claim {c['id']} timeline entry has no knowledge_time")
                 continue
-            if k < kt:
+            if kt is not None and k < kt:
                 err(f"claim {c['id']} timeline starts at {k}, before the claim was made ({kt})")
             if k < last:
                 err(f"claim {c['id']} timeline is out of order at {k}")

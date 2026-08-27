@@ -149,8 +149,9 @@ drag, a tap on the rail and a two-finger pinch all still do what they did.
 Then it loads the page once more in each theme and measures the contrast of
 every small explanatory string against its real background — photographing the
 painted pixels behind the stage overlays, because a computed `background-color`
-cannot see the gradient they sit on. 69 checks, wired into `build.py`, exits
-non-zero.
+cannot see the gradient they sit on. And it asks the page where the knowledge
+rail ends, and compares that with what the Python tools read. 70 checks, wired
+into `build.py`, exits non-zero.
 
 It exists because this project lost an entire build to a boot failure that
 nothing detected: a legend swatch read the wrong palette key, `undefined` reached
@@ -175,6 +176,15 @@ git config core.hooksPath .githooks
 Run it over everything already tracked with `--all`. All seven of its cases —
 four leak shapes, three that must not fire — are verified against a staged file
 and a real `git commit`, not against the checker called directly.
+
+The knowledge-time bounds are declared once, in `src/20_core.js`, and
+`tools/knowledge_time.py` reads them out of it — nothing mirrors them by hand.
+They had been typed out in seven places, and when the ceiling moved from 2025 to
+2026 so a 2026 paper's status entry could fire, four were left behind:
+`stage4_merge.py` refused a well-formed 2026 claim, `ingest.py` silently
+rewrote a 2026 citation's year to 2025, and the rail's own button and ARIA
+range still advertised the old year. Moving the ceiling is one edit now, and
+the smoke test compares the running page with what the tools read.
 
 `tools/validate_graph.py` is a gate, not a formatter. It checks referential
 integrity, schema discipline and coordinate sanity, and it asserts the product's

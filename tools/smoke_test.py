@@ -31,6 +31,7 @@ import argparse, base64, functools, http.server, json, os, re, socketserver, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
+sys.path.insert(0, HERE)
 
 
 # ------------------------------------------------------------------ reporting
@@ -580,6 +581,26 @@ def run(url, headed, report):
         report.check("the K-Pg date is disputed in 1970 and settled now",
                      numbers["kpgDisputed1970"] and not numbers["kpgDisputedNow"],
                      json.dumps(numbers))
+
+        # ------- 15. the page and the Python tools agree on where the rail ends
+        # src/20_core.js is the source of truth and says so, but the ceiling had
+        # been typed out in six more places. Two Python tools were still on 2025
+        # after it moved to 2026: stage4_merge refused a valid 2026 claim, and
+        # ingest rewrote a 2026 citation's year to 2025. The tools now read it
+        # from the source file; this pins the running page to the same value.
+        from knowledge_time import KT_MIN as PY_MIN, KT_MAX as PY_MAX
+        rail = page.evaluate("""() => ({
+          min: KT_MIN, max: KT_MAX,
+          railMin: +document.getElementById('krailcv').getAttribute('aria-valuemin'),
+          railMax: +document.getElementById('krailcv').getAttribute('aria-valuemax'),
+          nowLabel: document.getElementById('btn-now').textContent.trim(),
+          diffMax: +document.getElementById('diff-a').max
+        })""")
+        report.check("the page and the Python tools end the rail in the same year",
+                     rail["min"] == PY_MIN and rail["max"] == PY_MAX
+                     and rail["railMin"] == PY_MIN and rail["railMax"] == PY_MAX
+                     and rail["nowLabel"] == str(PY_MAX) and rail["diffMax"] == PY_MAX,
+                     f"python {PY_MIN}..{PY_MAX}   page {json.dumps(rail)}")
 
         report.check("no page errors across the whole desktop run", not page_errors,
                      " | ".join(page_errors[:2]))
