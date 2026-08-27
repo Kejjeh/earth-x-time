@@ -4,6 +4,29 @@
    ========================================================================== */
 
 const elDetail = document.getElementById('detail');
+const elStatus = document.getElementById('sr-status');
+
+/* One line, announced only when something worth saying has changed.
+
+   #detail used to be the live region, and renderDetail rewrites it from the
+   needPanel block that every setKt sets, so scrubbing the rail re-announced the
+   whole 8.9 KB panel once per year. What a screen reader needs is the thing
+   selected, where it resolves to, and whether anyone disagrees - a sentence.
+
+   The key is separate from the line on purpose, and both halves of that matter.
+   Keying on the selection alone goes silent through the one interaction the
+   README leads with - hold a selection, scrub the rail, watch the date collapse.
+   Keying on the sentence is too twitchy the other way: the connection count
+   climbs as edges arrive, so sweeping the rail a year at a time announced 13
+   times against the 8 occasions the date or the standing actually moved. The
+   key is the referent, the resolved date, the status and whether it is disputed
+   - exactly the set of things the second axis exists to move. */
+let announced = null;
+function announceSelection(key, line) {
+  if (!elStatus || key === announced) return;
+  announced = key;
+  elStatus.textContent = line || '';
+}
 
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g,
@@ -70,6 +93,12 @@ function renderDetail() {
       Object.prototype.hasOwnProperty.call(R.referents, S.selection)) {
     const ref = R.referents[S.selection];
     const first = firstDatedYear(S.selection);
+    /* Keyed without the year: scrubbing 1650 to 1900 with this selected is one
+       piece of news, not two hundred and fifty. The year the record changes is
+       the durable half, so the line carries that rather than the current one. */
+    announceSelection(`${ref.id}|unknown`,
+      `${ref.label}: nothing datable is claimed about this yet.`
+      + (isFinite(first) ? ` The first dated claim arrives in ${first}.` : ''));
     const pending = (R.byRef[S.selection] || [])
       .filter(c => c.knowledge_time > S.kt)
       .sort((a, b) => a.knowledge_time - b.knowledge_time);
@@ -99,6 +128,7 @@ function renderDetail() {
   }
 
   if (!S.selection || !F.items[S.selection]) {
+    announceSelection('', '');
     const disp = F.visible.filter(i => i.res.disputed)
       .sort((a, b) => (b.res.oldest - b.res.youngest) - (a.res.oldest - a.res.youngest))
       .slice(0, 5);
@@ -138,6 +168,14 @@ function renderDetail() {
     ? fmtYbp(r.winner.claim.earth_time_start)
     : `${fmtYbp(r.oldest)} – ${fmtYbp(r.youngest)}`;
   const prec = r.winner ? fmtPrecision(r.winner.claim.time_precision) : null;
+
+  announceSelection(
+    `${ref.id}|${Math.round(r.pos)}|${r.winner ? r.winner.status : 'none'}|${r.disputed}`,
+    `${ref.label}, ${dateLine}`
+    + (r.winner ? `, ${r.winner.status}, resolved to ${r.winner.claim.asserted_by}` : ', not resolved')
+    + (r.disputed ? `, disputed across ${fmtSpan(r.oldest - r.youngest)}` : '')
+    + `. ${r.pool.length} claim${r.pool.length === 1 ? '' : 's'} competing for the date`
+    + `, ${outE.length + inE.length} connection${outE.length + inE.length === 1 ? '' : 's'}.`);
 
   elDetail.innerHTML = `
     <div class="dt-head">

@@ -35,14 +35,22 @@
       </div>
     </div>
 
-    <div class="detail" id="detail" tabindex="-1" aria-live="polite"></div>
+    <div class="detail" id="detail" tabindex="-1"></div>
+    <p class="sr" id="sr-status" role="status" aria-live="polite"></p>
   </aside>
 
   <!-- ================================= STAGE ================================== -->
   <main class="stage" id="stage">
     <!-- application, not img: arrow keys must reach the canvas to rotate it,
          and a screen reader should not swallow them. Selections are announced
-         through the detail panel, which is the aria-live region. -->
+         through #sr-status below, one line at a time.
+
+         That is a deliberate change from announcing through #detail itself.
+         The intent was right and the granularity was not: renderDetail rewrites
+         the panel from the needPanel block, which every setKt sets, so an
+         8.9 KB region was re-announced 226 times across one 16-second Replay.
+         A selection is worth saying; a selection is not worth saying once per
+         year of a scrub. -->
     <canvas id="globe" tabindex="0" role="application"
             aria-label="Orthographic globe of dated claims about Earth history. Arrow keys rotate, plus and minus zoom, Escape clears the selection."></canvas>
 
@@ -67,7 +75,11 @@
       </div>
     </div>
 
-    <div class="tip" id="tip" role="status"></div>
+    <!-- The tooltip repeats what the panel already carries, and it is rewritten
+         on every hover pointermove - as role="status" that was a second flood on
+         top of the panel's. It is also mouse-only: the hover branch sits after
+         the drag branch returns, so it never fires on touch at all. -->
+    <div class="tip" id="tip" aria-hidden="true"></div>
   </main>
 
   <!-- =========================== KNOWLEDGE-TIME RAIL =========================== -->

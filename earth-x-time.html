@@ -543,14 +543,22 @@ button { background: none; border: none; cursor: pointer; padding: 0; }
       </div>
     </div>
 
-    <div class="detail" id="detail" tabindex="-1" aria-live="polite"></div>
+    <div class="detail" id="detail" tabindex="-1"></div>
+    <p class="sr" id="sr-status" role="status" aria-live="polite"></p>
   </aside>
 
   <!-- ================================= STAGE ================================== -->
   <main class="stage" id="stage">
     <!-- application, not img: arrow keys must reach the canvas to rotate it,
          and a screen reader should not swallow them. Selections are announced
-         through the detail panel, which is the aria-live region. -->
+         through #sr-status below, one line at a time.
+
+         That is a deliberate change from announcing through #detail itself.
+         The intent was right and the granularity was not: renderDetail rewrites
+         the panel from the needPanel block, which every setKt sets, so an
+         8.9 KB region was re-announced 226 times across one 16-second Replay.
+         A selection is worth saying; a selection is not worth saying once per
+         year of a scrub. -->
     <canvas id="globe" tabindex="0" role="application"
             aria-label="Orthographic globe of dated claims about Earth history. Arrow keys rotate, plus and minus zoom, Escape clears the selection."></canvas>
 
@@ -575,7 +583,11 @@ button { background: none; border: none; cursor: pointer; padding: 0; }
       </div>
     </div>
 
-    <div class="tip" id="tip" role="status"></div>
+    <!-- The tooltip repeats what the panel already carries, and it is rewritten
+         on every hover pointermove - as role="status" that was a second flood on
+         top of the panel's. It is also mouse-only: the hover branch sits after
+         the drag branch returns, so it never fires on touch at all. -->
+    <div class="tip" id="tip" aria-hidden="true"></div>
   </main>
 
   <!-- =========================== KNOWLEDGE-TIME RAIL =========================== -->
@@ -2261,6 +2273,29 @@ function stopReplay() {
    ========================================================================== */
 
 const elDetail = document.getElementById('detail');
+const elStatus = document.getElementById('sr-status');
+
+/* One line, announced only when something worth saying has changed.
+
+   #detail used to be the live region, and renderDetail rewrites it from the
+   needPanel block that every setKt sets, so scrubbing the rail re-announced the
+   whole 8.9 KB panel once per year. What a screen reader needs is the thing
+   selected, where it resolves to, and whether anyone disagrees - a sentence.
+
+   The key is separate from the line on purpose, and both halves of that matter.
+   Keying on the selection alone goes silent through the one interaction the
+   README leads with - hold a selection, scrub the rail, watch the date collapse.
+   Keying on the sentence is too twitchy the other way: the connection count
+   climbs as edges arrive, so sweeping the rail a year at a time announced 13
+   times against the 8 occasions the date or the standing actually moved. The
+   key is the referent, the resolved date, the status and whether it is disputed
+   - exactly the set of things the second axis exists to move. */
+let announced = null;
+function announceSelection(key, line) {
+  if (!elStatus || key === announced) return;
+  announced = key;
+  elStatus.textContent = line || '';
+}
 
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g,
@@ -2327,6 +2362,12 @@ function renderDetail() {
       Object.prototype.hasOwnProperty.call(R.referents, S.selection)) {
     const ref = R.referents[S.selection];
     const first = firstDatedYear(S.selection);
+    /* Keyed without the year: scrubbing 1650 to 1900 with this selected is one
+       piece of news, not two hundred and fifty. The year the record changes is
+       the durable half, so the line carries that rather than the current one. */
+    announceSelection(`${ref.id}|unknown`,
+      `${ref.label}: nothing datable is claimed about this yet.`
+      + (isFinite(first) ? ` The first dated claim arrives in ${first}.` : ''));
     const pending = (R.byRef[S.selection] || [])
       .filter(c => c.knowledge_time > S.kt)
       .sort((a, b) => a.knowledge_time - b.knowledge_time);
@@ -2356,6 +2397,7 @@ function renderDetail() {
   }
 
   if (!S.selection || !F.items[S.selection]) {
+    announceSelection('', '');
     const disp = F.visible.filter(i => i.res.disputed)
       .sort((a, b) => (b.res.oldest - b.res.youngest) - (a.res.oldest - a.res.youngest))
       .slice(0, 5);
@@ -2395,6 +2437,14 @@ function renderDetail() {
     ? fmtYbp(r.winner.claim.earth_time_start)
     : `${fmtYbp(r.oldest)} – ${fmtYbp(r.youngest)}`;
   const prec = r.winner ? fmtPrecision(r.winner.claim.time_precision) : null;
+
+  announceSelection(
+    `${ref.id}|${Math.round(r.pos)}|${r.winner ? r.winner.status : 'none'}|${r.disputed}`,
+    `${ref.label}, ${dateLine}`
+    + (r.winner ? `, ${r.winner.status}, resolved to ${r.winner.claim.asserted_by}` : ', not resolved')
+    + (r.disputed ? `, disputed across ${fmtSpan(r.oldest - r.youngest)}` : '')
+    + `. ${r.pool.length} claim${r.pool.length === 1 ? '' : 's'} competing for the date`
+    + `, ${outE.length + inE.length} connection${outE.length + inE.length === 1 ? '' : 's'}.`);
 
   elDetail.innerHTML = `
     <div class="dt-head">
@@ -3313,8 +3363,15 @@ elDetail.addEventListener('click', e => {
   const b = e.target.closest('[data-goto]'); if (!b) return;
   const plan = revealReferent(b.dataset.goto);
   if (!plan) return;
+  /* The hop rebuilds the panel, so the button that had focus stops existing and
+     focus falls to <body> - which makes the causal graph unwalkable from the
+     keyboard: every step threw the user to the top of the document to Tab back.
+     Only re-aim focus if it was in the panel to begin with, so a mouse click
+     does not steal it from wherever it was. */
+  const hadFocus = elDetail.contains(document.activeElement);
   flyTo(plan);
   elDetail.scrollTop = 0;
+  if (hadFocus) elDetail.focus({ preventScroll: true });
 });
 
 /* Both of these are in the hash, so both have to go through changed().
