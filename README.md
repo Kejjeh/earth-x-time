@@ -135,13 +135,14 @@ clickable as it is big, do the rival markers agree with the band they sit in, an
 does toggling the basemap reach the URL, does a link to something not yet known
 explain itself rather than reading as empty, does a hop inside the panel land on
 something that is actually drawn, does revealing something already on screen
-leave the window alone, and is `Compare eras` as modal as it declares itself.
+leave the window alone, is `Compare eras` as modal as it declares itself, and do
+the resolver's own headline numbers still hold.
 
 Then it opens a second context at 390x844 with real touch and asks the phone
 build the questions the desktop one cannot: can a finger reach every control on
 the stage, does tapping a marker put its panel where you can see it, does
 choosing a search result fly a globe that is on screen, is the globe's focus
-ring inside its own clipping box. 59 checks, wired into `build.py`, exits
+ring inside its own clipping box. 61 checks, wired into `build.py`, exits
 non-zero.
 
 It exists because this project lost an entire build to a boot failure that
@@ -171,9 +172,18 @@ and a real `git commit`, not against the checker called directly.
 `tools/validate_graph.py` is a gate, not a formatter. It checks referential
 integrity, schema discipline and coordinate sanity, and it asserts the product's
 own promises: that the required cross-domain causal chain is wired end to end,
-that the six disputed referents really do carry rival dates, that consensus and
-newest resolvers disagree somewhere, and that Chicxulub → K–Pg is absent in 1975
-and live by 1985. It exits non-zero on any of those.
+that the five permanently disputed referents really do carry rival dates as
+understood in 2026, that the K–Pg date is disputed in 1970 and settled now, that
+consensus and newest resolvers disagree somewhere, and that Chicxulub → K–Pg is
+absent in 1975 and live by 1985. It exits non-zero on any of those.
+
+Those assertions run through a `resolve()` that mirrors `src/30_model.js` line
+for line, because for a while they did not, and a gate that asks a different
+question is not a gate: it reported 24 resolver movers where the page moves 28,
+and reported K–Pg carrying three rival dates with a 1.04 Myr spread where the
+page settles it to one date and a 22 kyr envelope. The two implementations are
+now pinned to the same figures from both ends — the smoke test asks the browser
+for the same numbers.
 
 ## Known gaps
 

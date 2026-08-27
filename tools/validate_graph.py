@@ -63,20 +63,49 @@ def status_at(claim, kt):
     return cur
 
 
-def resolve(claims_for_ref, kt, mode):
-    live = []
-    for c in claims_for_ref:
-        st = status_at(c, kt)
-        if st is None:
-            continue
-        live.append((c, st))
-    if not live:
+def resolve(claims_for_ref, kt, mode="consensus"):
+    """Mirror of resolve() in src/30_model.js. Returns None, or a dict.
+
+    Asserting the product's promises against a resolver that is not the
+    product's resolver is not a gate. This used to sort every claim handed to
+    it, over a by_ref that had already been narrowed to dating+existence for a
+    different check, with no notion of an envelope at all — so it reported 24
+    resolver movers where the page moves 28, and reported kpg_extinction
+    carrying three rival dates with a 1.04 Myr spread where the page resolves it
+    to one date, a 22 kyr envelope and disputed=False.
+
+    The three rules that have to be mirrored, all of them from the README:
+      - only claims that carry a date compete for the position;
+      - among those, only type=="dating" are rivals for the DATE, falling back
+        to every dated claim when a referent has none;
+      - superseded claims stay live but stop stretching the envelope.
+    """
+    live = [(c, status_at(c, kt)) for c in claims_for_ref]
+    live = [(c, s) for c, s in live if s is not None]
+    dated = [(c, s) for c, s in live if isinstance(c.get("earth_time_start"), (int, float))]
+    if not dated:
         return None
-    if mode == "frontier":
-        live.sort(key=lambda p: (-p[0]["knowledge_time"], -ACCEPT[p[1]]))
-    else:
-        live.sort(key=lambda p: (-ACCEPT[p[1]], -p[0]["knowledge_time"]))
-    return live[0][0]
+    pool = [(c, s) for c, s in dated if c["type"] == "dating"] or dated
+
+    by_consensus = sorted(pool, key=lambda p: (-ACCEPT[p[1]], -p[0]["knowledge_time"]))
+    by_frontier = sorted(pool, key=lambda p: (-p[0]["knowledge_time"], -ACCEPT[p[1]]))
+    winner = by_frontier[0] if mode == "frontier" else by_consensus[0]
+
+    standing = [(c, s) for c, s in pool if s != "superseded"] or pool
+    oldest = max(c["earth_time_start"] + (c.get("time_precision") or 0) for c, _ in standing)
+    youngest = min(max(0, c["earth_time_end"] - (c.get("time_precision") or 0))
+                   for c, _ in standing)
+    distinct = {round(c["earth_time_start"]) for c, _ in standing}
+
+    return {
+        "winner": winner[0], "status": winner[1], "pool": pool, "dated": dated,
+        "oldest": oldest, "youngest": youngest, "distinct": distinct,
+        "disputed": len(distinct) > 1,
+        "consensus_pos": by_consensus[0][0]["earth_time_start"],
+        "frontier_pos": by_frontier[0][0]["earth_time_start"],
+        "moves": by_consensus[0][0]["id"] != by_frontier[0][0]["id"]
+                 and by_consensus[0][0]["earth_time_start"] != by_frontier[0][0]["earth_time_start"],
+    }
 
 
 ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-"
@@ -299,30 +328,49 @@ def main():
             errors.append(f"REQUIRED causal chain link missing: {a} -> {b}")
 
     # ---- disputed referents must actually render as bands -----------------
+    # Every claim about a referent, exactly as R.byRef is built: resolve() is
+    # the one place allowed to decide which of them compete for what. Narrowing
+    # here is how this file came to be asserting the product's promises against
+    # a resolver that was not the product's.
     by_ref = collections.defaultdict(list)
     for c in claims:
-        if c["type"] in ("dating", "existence") and c["about"] in rid:
+        if c["about"] in rid:
             by_ref[c["about"]].append(c)
 
     must_dispute = ["origin_of_life", "peopling_americas", "snowball_earth",
-                    "kpg_extinction", "thera_eruption", "homo_sapiens"]
+                    "thera_eruption", "homo_sapiens"]
     for r in must_dispute:
-        # Any dated claim competes for the referent's position, not just type=="dating".
-        dated = {round(c["earth_time_start"]) for c in by_ref.get(r, [])}
-        if len(dated) < 2:
-            errors.append(f"{r}: only {len(dated)} distinct date(s) — renders as a dot, not a band")
+        res = resolve(by_ref.get(r, []), KT_MAX)
+        if not res or not res["disputed"]:
+            errors.append(f"{r}: resolves to a single date as understood in {KT_MAX} — "
+                          f"renders as a dot, not a band")
         else:
-            spread = max(dated) - min(dated)
-            print(f"    band {r}: {len(dated)} distinct dates, spread {spread:,.0f} yr")
+            print(f"    band {r}: {len(res['distinct'])} distinct dates, "
+                  f"spread {res['oldest'] - res['youngest']:,.0f} yr")
+
+    # ---- K-Pg is the one that has to CHANGE, not the one that stays split --
+    # Its two dating claims agree within a megayear, so at KT_MAX it is settled
+    # and drawing it as a band would be a bug. The promise is that disputed is
+    # knowledge-time-dependent: contested in 1970, settled now. Asserting it in
+    # the must_dispute list asserted the opposite of the README.
+    kpg_then = resolve(by_ref.get("kpg_extinction", []), 1970)
+    kpg_now = resolve(by_ref.get("kpg_extinction", []), KT_MAX)
+    if not kpg_then or not kpg_then["disputed"]:
+        errors.append("kpg_extinction is not disputed in 1970 — the settling demo is broken")
+    if not kpg_now or kpg_now["disputed"]:
+        errors.append(f"kpg_extinction is still disputed in {KT_MAX} — the settling demo is broken")
+    if kpg_then and kpg_now:
+        print(f"    kpg_extinction: {len(kpg_then['distinct'])} rival dates in 1970 "
+              f"(spread {kpg_then['oldest'] - kpg_then['youngest']:,.0f} yr) -> "
+              f"{len(kpg_now['distinct'])} in {KT_MAX} "
+              f"(spread {kpg_now['oldest'] - kpg_now['youngest']:,.0f} yr)")
 
     # ---- resolver modes must visibly disagree somewhere -------------------
     movers = []
     for r, cs in by_ref.items():
-        dating = [c for c in cs if c["type"] == "dating"] or cs
-        a = resolve(dating, KT_MAX, "consensus")
-        b = resolve(dating, KT_MAX, "frontier")
-        if a and b and a["id"] != b["id"] and a["earth_time_start"] != b["earth_time_start"]:
-            movers.append((r, a["earth_time_start"], b["earth_time_start"]))
+        res = resolve(cs, KT_MAX)
+        if res and res["moves"]:
+            movers.append((r, res["consensus_pos"], res["frontier_pos"]))
     if not movers:
         errors.append("no referent moves between consensus and frontier — required demo #6 fails")
 
