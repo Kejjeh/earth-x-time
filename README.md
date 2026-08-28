@@ -197,9 +197,19 @@ Obvious placeholders (`/home/you/…`) still pass. The hook is versioned in
 git config core.hooksPath .githooks
 ```
 
-Run it over everything already tracked with `--all`. All seven of its cases —
-four leak shapes, three that must not fire — are verified against a staged file
-and a real `git commit`, not against the checker called directly.
+Run it over everything already tracked with `--all`. Its cases — eight leak
+shapes, seven that must not fire, and the staged blob read both ways — are
+verified against a staged file and a real `git commit`, not against the checker
+called directly, and the smoke test drives those commits in a throwaway repo on
+every build.
+
+It matches an absolute path token and then looks for a home segment inside it,
+rather than matching the segment directly. The first version did the latter,
+with a lookbehind to keep `docs/home/index.md` from firing, and that lookbehind
+also required the segment to sit at the root: `/mnt/c/Users/name`,
+`/c/Users/name`, `/var/home/name` and `\\server\Users\name` all committed
+clean. Git Bash renders `C:\Users\name` as `/c/Users/name`, so the checker had
+been missing the shape of the exact incident it exists for.
 
 The knowledge-time bounds are declared once, in `src/20_core.js`, and
 `tools/knowledge_time.py` reads them out of it — nothing mirrors them by hand.
