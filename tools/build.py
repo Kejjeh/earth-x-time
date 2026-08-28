@@ -20,6 +20,78 @@ def read(p):
         return f.read()
 
 
+# Elements that belong to a <head>. The artifact host supplies its own, so these
+# must not travel into the body it wraps, and "harmless if they do" is wrong:
+# Chromium honours a <base> wherever it sits, so a leaked one silently repoints
+# every relative URL on the host page, and a leaked <link rel="icon"> lands in
+# the DOM beside the host's own favicon.
+HEAD_ONLY = ("meta", "link", "base")
+
+# One token of the head prelude: a comment, a whole <title>...</title>, any other
+# tag, or the run of text between them. Anything that does not tokenise is a
+# shape this does not know, and is refused rather than guessed at.
+_PRELUDE_TOKEN = re.compile(
+    r"(?P<comment><!--.*?-->)"
+    r"|(?P<title><title\b[^>]*>.*?</title\s*>)"
+    r"|<(?P<name>[A-Za-z][\w:-]*)\b[^>]*>"
+    r"|(?P<text>[^<]+)",
+    re.S | re.I)
+
+
+def artifact_head(head, where="src/00_head.html"):
+    """The <head> content, minus the parts the artifact host supplies itself.
+
+    Keeps <title>, which the publisher reads, and the inlined <style>.
+
+    This used to be `re.sub(r'^<meta [^>]*/>\n', ...)`, which recognised the two
+    tags this file happened to have, spelled the way it happened to spell them.
+    Five other shapes went straight into the body: a <meta> without the trailing
+    slash, an indented one, an uppercase one, a <link>, a <base>.
+
+    Teaching the pattern those five shapes would fail the same way at the sixth,
+    so this refuses what it does not recognise instead of passing it through. A
+    build that stops is a bad minute; a <base> loose in someone else's page is
+    not something they would think to look for.
+    """
+    cut = re.search(r"<style\b", head, re.I)
+    if not cut:
+        sys.exit(f"FATAL: no <style> in {where}; the artifact build splits the head "
+                 "there and no longer knows where the prelude ends.")
+    prelude, styles = head[:cut.start()], head[cut.start():]
+
+    kept, pos = [], 0
+    for m in _PRELUDE_TOKEN.finditer(prelude):
+        if m.start() != pos:
+            sys.exit(f"FATAL: cannot parse the head prelude of {where} at character "
+                     f"{pos}: {prelude[pos:pos + 70]!r}")
+        pos = m.end()
+        if m.group("comment"):
+            continue
+        if m.group("title"):
+            kept.append(m.group(0).strip())
+            continue
+        if m.group("text") is not None:
+            if m.group("text").strip():
+                sys.exit(f"FATAL: stray text in the head prelude of {where}: "
+                         f"{m.group('text').strip()[:70]!r}")
+            continue
+        name = m.group("name").lower()
+        if name in HEAD_ONLY:
+            continue
+        sys.exit(f"FATAL: unrecognised <{name}> in the head prelude of {where}. The "
+                 f"artifact build keeps <title> and the inlined <style> and drops "
+                 f"{'/'.join(HEAD_ONLY)}; decide what artifact_head() should do with "
+                 f"<{name}> rather than letting it into the body by default.")
+    if pos != len(prelude):
+        sys.exit(f"FATAL: cannot parse the head prelude of {where} at character "
+                 f"{pos}: {prelude[pos:pos + 70]!r}")
+
+    if not kept:
+        sys.exit(f"FATAL: no <title> survived the head prelude of {where}; the "
+                 "artifact publisher reads it to name the page.")
+    return "\n".join(kept) + "\n" + styles
+
+
 def main():
     head = read(os.path.join(SRC, "00_head.html"))
     body = read(os.path.join(SRC, "10_body.html"))
@@ -59,10 +131,15 @@ def main():
     if re.search(r"</script", js, re.I):
         sys.exit("FATAL: a literal </script> inside the JS payload would close the tag early")
 
-    # The artifact host supplies its own <head>, so drop our meta tags there and
-    # keep only <title> (which the publisher reads) plus the inlined styles.
-    art = re.sub(r'^<meta [^>]*/>\n', '', head, flags=re.M) + "\n" + body + \
-        '\n<script>\n' + js + '\n</script>\n'
+    art_head = artifact_head(head)
+    # Belt and braces over the markup, and only the markup: the JS payload below
+    # is prose as much as code, and its comments discuss <html> and <body> in
+    # English. Widening this to the whole file would fail on a sentence.
+    stray = re.search(r"<\s*(meta|link|base)\b", art_head + body, re.I)
+    if stray:
+        sys.exit(f"FATAL: a head-only <{stray.group(1)}> reached artifact.html: "
+                 f"{(art_head + body)[stray.start():stray.start() + 70]!r}")
+    art = art_head + "\n" + body + '\n<script>\n' + js + '\n</script>\n'
     out_art = os.path.join(ROOT, "artifact.html")
     with open(out_art, "w", encoding="utf-8") as f:
         f.write(art)
