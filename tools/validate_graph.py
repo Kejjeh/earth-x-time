@@ -316,6 +316,19 @@ def main():
                     errors.append(f"{w}: lat {gm['lat']} out of range")
                 if not (-180 <= gm["lng"] <= 180):
                     errors.append(f"{w}: lng {gm['lng']} out of range")
+        # Neither this file nor stage4_merge.py looked at time_precision. A
+        # negative one inverts the envelope resolve() builds - oldest comes out
+        # younger than youngest - and the panel renders "+/- -5000 yr" beside a
+        # span of "-10,000 years".
+        tp = c.get("time_precision")
+        if isinstance(tp, bool) or not isinstance(tp, (int, float)):
+            errors.append(f"{w}: time_precision {tp!r} is not a number")
+            c["time_precision"] = 0
+        elif tp < 0:
+            errors.append(f"{w}: time_precision {tp} is negative — it would invert the band")
+        elif tp > 4.6e9:
+            errors.append(f"{w}: time_precision {tp} is wider than the age of the Earth")
+
         zb = c.get("zoom_band") or [0, 10]
         if len(zb) != 2 or zb[0] > zb[1]:
             warns.append(f"{w}: bad zoom_band {zb} -> [0,10]")

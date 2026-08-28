@@ -1,14 +1,21 @@
 """
 Merge stage-4 authored claims into the graph.
 
-    python tools/stage4_merge.py <workflow-output.json> [--dry-run]
+    python tools/stage4_merge.py <workflow-output.json>           # dry run
+    python tools/stage4_merge.py <workflow-output.json> --write
 
-Takes the output of the author-status workflow, checks it against the same rules
-tools/validate_graph.py enforces, attaches the referents that tools/ingest.py
-resolved (with their Wikidata QIDs), and writes src/graph.json.
+Takes the output of the author-status workflow, checks each claim against the
+per-claim rules tools/validate_graph.py enforces, attaches the referents that
+tools/ingest.py resolved (with their Wikidata QIDs), and writes src/graph.json.
 
 Refuses to merge anything that would violate the schema, and reports what it
 rejected rather than quietly dropping it.
+
+It is a per-CLAIM check only: referential integrity across the whole graph, the
+narrative gates, and the coordinate triage all live in tools/validate_graph.py,
+which is why that is the next step and not build.py. Claiming more than this is
+what let significance "high", zoom_band [10,0] and a negative time_precision
+merge clean.
 """
 import json, os, sys, argparse, collections, html
 
@@ -79,6 +86,28 @@ def check(c, known_referents):
         for e in st:
             if e["status"] not in STATUSES:
                 bad.append(f"bad status {e['status']}")
+    # REQUIRED lists these three, and nothing validated their values, so a
+    # claim carrying significance "high", zoom_band [10,0] or a negative
+    # time_precision merged clean - against a docstring promising the same rules
+    # validate_graph.py enforces.
+    sig = c.get("significance")
+    if isinstance(sig, bool) or not isinstance(sig, (int, float)):
+        bad.append(f"significance {sig!r} is not a number")
+    elif not (1 <= sig <= 5):
+        bad.append(f"significance {sig} outside 1-5")
+    zb = c.get("zoom_band")
+    if (not isinstance(zb, list) or len(zb) != 2
+            or not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in zb)
+            or zb[0] > zb[1]):
+        bad.append(f"bad zoom_band {zb!r}")
+    tp = c.get("time_precision")
+    if isinstance(tp, bool) or not isinstance(tp, (int, float)):
+        bad.append(f"time_precision {tp!r} is not a number")
+    elif tp < 0:
+        # A negative one inverts resolve()'s envelope - oldest ends up younger
+        # than youngest - and the panel prints "+/- -5000 yr".
+        bad.append(f"time_precision {tp} is negative")
+
     gm = c.get("geometry") or {}
     if gm.get("mode") in ("point", "region"):
         if gm.get("lat") is None or gm.get("lng") is None:
@@ -93,7 +122,15 @@ def main():
     ap.add_argument("workflow_output")
     ap.add_argument("--ingested", default=os.path.join(ROOT, "src", "ingested.json"))
     ap.add_argument("--graph", default=os.path.join(ROOT, "src", "graph.json"))
-    ap.add_argument("--dry-run", action="store_true")
+    # Dry run by default, like tools/apply_patch.py. It used to be the other
+    # way round: two tools in this directory merge authored content into
+    # src/graph.json, and they had opposite defaults, so confusing them wrote to
+    # the committed graph when you meant to see a plan. --dry-run is still
+    # accepted and still means what it says.
+    ap.add_argument("--write", action="store_true",
+                    help="apply the merge; without it this is a dry run")
+    ap.add_argument("--dry-run", action="store_true",
+                    help=argparse.SUPPRESS)
     a = ap.parse_args()
 
     wf = unescape(load_workflow(a.workflow_output))
@@ -177,8 +214,8 @@ def main():
         for cid, about, probs in rejected[:15]:
             print(f"  {cid} ({about}): {'; '.join(probs)}")
 
-    if a.dry_run:
-        print("\n--dry-run: nothing written.")
+    if a.dry_run or not a.write:
+        print("\n(dry run; pass --write to apply)")
         return 0
 
     graph["claims"].extend(merged)
@@ -186,7 +223,11 @@ def main():
               separators=(",", ":"), ensure_ascii=False)
     print(f"\nwrote {a.graph}: {len(graph['referents'])} referents, "
           f"{len(graph['claims'])} claims, {len(graph['edges'])} edges")
-    print("Next: python tools/build.py")
+    # validate_graph.py is the gate; check() above is only a per-claim subset of
+    # it and says nothing about referential integrity across the whole graph.
+    # Pointing straight at build.py, which does not validate, let a malformed
+    # merge reach the built page unchallenged.
+    print("Next: python tools/validate_graph.py, then python tools/build.py")
     return 0
 
 
