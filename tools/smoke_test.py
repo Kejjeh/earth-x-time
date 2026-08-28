@@ -1155,6 +1155,77 @@ def run_contrast(url, headed, report):
         browser.close()
 
 
+# ------------------------------------------------- the artifact head, offline
+# No browser needed: this is a property of what tools/build.py emits, and it is
+# the one gate that ran for a year without ever being exercised.
+def run_artifact(report):
+    """Prove that nothing head-only can reach the body of artifact.html.
+
+    The strip step used to be a pattern that matched the two tags src/00_head.html
+    happened to have. Five other shapes rode through it into the body, where a
+    <base> is honoured by Chromium and repoints every relative URL on the host
+    page. So the property under test is not "the current head is stripped" - that
+    passed the whole time - it is "a head-only tag cannot get through, whatever
+    it looks like": stripped, or the build stops. Never quietly kept.
+    """
+    sys.path.insert(0, HERE)
+    import build
+
+    tail = '<title>T</title>\n<style>b{color:red}</style>'
+    shapes = [
+        ("self-closed", '<meta charset="utf-8" />\n' + tail),
+        ("bare, no slash", '<meta charset="utf-8">\n' + tail),
+        ("indented", '  <meta charset="utf-8" />\n' + tail),
+        ("uppercase", '<META charset="utf-8" />\n' + tail),
+        ("attributes split over lines", '<meta name="viewport"\n   content="width=1" />\n' + tail),
+        ("link rel=icon", '<link rel="icon" href="data:," />\n' + tail),
+        ("base href", '<base href="/" />\n' + tail),
+        ("comment then meta", '<!-- c -->\n<meta charset="utf-8">\n' + tail),
+    ]
+    for label, head in shapes:
+        try:
+            out = build.artifact_head(head, where="<test>")
+            leaked = re.findall(r"<\s*(?:meta|link|base)\b[^>]*>", out, re.I | re.S)
+            report.check(f"head-only tag cannot reach the body: {label}",
+                         not leaked, "stripped" if not leaked else f"LEAKED {leaked}")
+        except SystemExit as e:
+            report.check(f"head-only tag cannot reach the body: {label}",
+                         True, f"refused: {str(e)[:48]}")
+
+    # <title> is what the publisher reads to name the page, so it has to survive
+    # the strip, and its absence has to stop the build rather than ship unnamed.
+    kept = build.artifact_head('<meta charset="utf-8">\n' + tail, where="<test>")
+    report.check("<title> survives the strip", "<title>T</title>" in kept, kept[:40])
+    try:
+        build.artifact_head('<meta charset="utf-8">\n<style>b{}</style>', where="<test>")
+        report.check("a head with no <title> stops the build", False, "it did not")
+    except SystemExit:
+        report.check("a head with no <title> stops the build", True)
+
+    # An unknown head element is refused, not passed through on the assumption
+    # that whatever it is must be safe in a body.
+    try:
+        build.artifact_head('<nosuchtag x="1">\n' + tail, where="<test>")
+        report.check("an unrecognised head element stops the build", False, "it did not")
+    except SystemExit:
+        report.check("an unrecognised head element stops the build", True)
+
+    # And the file actually on disk, which is what gets published.
+    art = os.path.join(ROOT, "artifact.html")
+    if os.path.exists(art):
+        text = open(art, encoding="utf-8").read()
+        # The markup only. The JS payload's comments discuss <html> and <body>
+        # in English, so scanning the whole file would flag prose.
+        markup = text.split("\n<script>\n")[0]
+        found = re.findall(r"<\s*(?:meta|link|base)\b[^>]*>", markup, re.I | re.S)
+        report.check("built artifact.html carries no head-only tags",
+                     not found, f"{len(found)} found" if found else "none")
+        report.check("built artifact.html has a <title> for the publisher",
+                     re.search(r"<title\b[^>]*>.+?</title>", text[:8192], re.S | re.I) is not None)
+        report.check("built artifact.html opens body-only, with no document wrapper",
+                     not re.match(r"\s*<\s*(!doctype|html)\b", text, re.I), repr(text[:34]))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--url", default=None, help="test a deployed URL instead of the local build")
@@ -1174,6 +1245,7 @@ def main():
     print(f"smoke test: {url}")
     report = Report()
     try:
+        run_artifact(report)
         run(url, a.headed, report)
         run_mobile(url, a.headed, report)
         run_contrast(url, a.headed, report)
