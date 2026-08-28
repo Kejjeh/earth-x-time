@@ -210,6 +210,16 @@ rewrote a 2026 citation's year to 2025, and the rail's own button and ARIA
 range still advertised the old year. Moving the ceiling is one edit now, and
 the smoke test compares the running page with what the tools read.
 
+Two tools merge authored content into `src/graph.json`, and they now agree on
+the safe default: both `tools/apply_patch.py` and `tools/stage4_merge.py` are a
+dry run unless you pass `--write`. `stage4_merge.py` used to be the other way
+round, so confusing the two wrote to the committed graph when you meant to see
+a plan. Its own per-claim check also now covers `significance`, `zoom_band` and
+`time_precision` — all three were in its required-fields list and none of their
+values was ever looked at, against a docstring promising the same rules the
+validator enforces. It points at the validator before the build, because
+`build.py` does not validate.
+
 `tools/validate_graph.py` is a gate, not a formatter. It checks referential
 integrity, schema discipline and coordinate sanity, and it asserts the product's
 own promises: that the required cross-domain causal chain is wired end to end,
