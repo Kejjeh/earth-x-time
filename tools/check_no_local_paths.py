@@ -32,16 +32,32 @@ import sys
 # hide forever. Fragments keep the scan total.
 _U = 'Users'
 _H = 'home'
-_SEP = '[\\\\/]'
 
-PATTERNS = [
-    # C:\Users\name  /  C:/Users/name  - any drive letter, any slash style
-    ('windows home', re.compile(r'[A-Za-z]:' + _SEP + r'+' + _U + _SEP + r'+([A-Za-z0-9_.\-]+)')),
-    # /Users/name - macOS
-    ('macos home',   re.compile(r'(?<![A-Za-z0-9_.\-])/' + _U + r'/([A-Za-z0-9_.\-]+)')),
-    # /home/name - linux
-    ('linux home',   re.compile(r'(?<![A-Za-z0-9_.\-])/' + _H + r'/([A-Za-z0-9_.\-]+)')),
-]
+# An absolute path token: something starting at a filesystem root - a leading
+# slash, a drive letter, or a UNC \\ - and running to whitespace or the
+# punctuation that ends a path in prose.
+#
+# The first version matched the home segment directly, with a lookbehind to keep
+# `docs/home/index.md` from firing. That lookbehind also required the segment to
+# sit at the root, so every mount-prefixed form went straight through: the
+# character before `/Users` in `/mnt/c/Users/name` is `c`, so WSL, Git Bash and
+# Silverblue paths all committed clean. Git Bash renders `C:\Users\name` as
+# `/c/Users/name`, which is to say the checker missed the shape of the exact
+# incident it exists for.
+#
+# Anchoring on the token instead keeps relative paths out - `docs/home/x` never
+# starts at a root, so it is never a token - without blinding the scan to a
+# prefix in front of the part that names somebody.
+_TOKEN = re.compile(r'(?:[A-Za-z]:|\\\\|(?<![A-Za-z0-9_.\-]))[\\/][^\s"\'`,;)\]}<>]*')
+_HOME = re.compile(r'[\\/](' + _U + '|' + _H + r')[\\/]+([A-Za-z0-9_.\-]+)')
+
+
+def _kind(token, segment):
+    if re.match(r'[A-Za-z]:', token):
+        return 'windows home'
+    if token.startswith('\\\\'):
+        return 'unc home'
+    return 'macos home' if segment == _U else 'linux home'
 
 # Obvious stand-ins in documentation. A real account name is the thing we are
 # stopping; `/home/you/project` in a README is fine and should stay writable.
@@ -97,11 +113,13 @@ def scan(path, raw):
         return  # not text; nothing readable to leak
 
     for lineno, line in enumerate(text.splitlines(), 1):
-        for kind, rx in PATTERNS:
-            for m in rx.finditer(line):
-                if m.group(1) in PLACEHOLDERS:
+        for tok in _TOKEN.finditer(line):
+            token = tok.group(0)
+            for m in _HOME.finditer(token):
+                if m.group(2) in PLACEHOLDERS:
                     continue
-                yield lineno, kind, m.group(0)
+                yield lineno, _kind(token, m.group(1)), token
+                break
 
 
 def main(argv):

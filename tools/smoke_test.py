@@ -1226,6 +1226,108 @@ def run_artifact(report):
                      not re.match(r"\s*<\s*(!doctype|html)\b", text, re.I), repr(text[:34]))
 
 
+# --------------------------------------------- the pre-commit hook, for real
+# README.md claims these cases are verified "against a staged file and a real
+# git commit, not against the checker called directly", and that standard is
+# the whole point: the hook picks its own interpreter, git runs it from the
+# repo root, and the checker reads the staged blob rather than the file on
+# disk. Calling scan() in-process would exercise none of that. So this drives
+# real commits in a throwaway repo - never this one.
+def run_hook(report):
+    import shutil, subprocess, tempfile
+
+    env = dict(os.environ, GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_SYSTEM=os.devnull,
+               GIT_AUTHOR_NAME='t', GIT_AUTHOR_EMAIL='t@t',
+               GIT_COMMITTER_NAME='t', GIT_COMMITTER_EMAIL='t@t')
+    tmp = tempfile.mkdtemp(prefix='hook-check-')
+
+    def git(*a):
+        return subprocess.run(('git',) + a, cwd=tmp, env=env, capture_output=True, text=True)
+
+    def attempt(content, fname='p.md'):
+        """Stage content, try a real commit, return True if the commit landed."""
+        with open(os.path.join(tmp, fname), 'w', encoding='utf-8') as fh:
+            fh.write(content + '\n')
+        git('add', fname)
+        rc = git('commit', '-qm', 'case').returncode
+        git('reset', '-q', '--hard', 'HEAD')
+        git('clean', '-qfd')
+        return rc == 0
+
+    try:
+        os.makedirs(os.path.join(tmp, 'tools'))
+        os.makedirs(os.path.join(tmp, '.githooks'))
+        shutil.copy(os.path.join(ROOT, '.githooks', 'pre-commit'),
+                    os.path.join(tmp, '.githooks', 'pre-commit'))
+        shutil.copy(os.path.join(HERE, 'check_no_local_paths.py'),
+                    os.path.join(tmp, 'tools', 'check_no_local_paths.py'))
+        git('init', '-q', '.')
+        git('config', 'core.hooksPath', '.githooks')
+        git('add', '-A')
+        base = git('commit', '-qm', 'base')
+        if base.returncode:
+            report.check('scratch repo arms the hook', False, base.stderr.strip()[:90])
+            return
+        report.check('scratch repo arms the hook', True)
+
+        # Each of these names a real account and must never reach a public repo.
+        # The last four are the forms that used to commit clean: a mount prefix
+        # defeated the lookbehind the segment patterns relied on.
+        # Assembled from fragments for the same reason the checker's own patterns
+        # are: spelled out whole, these fixtures are themselves leaking paths in
+        # a tracked file, and --all would refuse this repo. Found the hard way -
+        # the first version of these checks failed its own --all check.
+        U, H, N = 'Us' + 'ers', 'ho' + 'me', 'jd' + 'oe'
+        for label, content in [
+            ('windows, backslash',   rf'see C:\{U}\{N}\proj\x.js'),
+            ('windows, forward',     f'see C:/{U}/{N}/proj/x.js'),
+            ('macOS',                f'see /{U}/{N}/proj/x.js'),
+            ('linux',                f'see /{H}/{N}/proj/x.js'),
+            ('WSL mount',            f'see /mnt/c/{U}/{N}/proj/x.js'),
+            ('Git Bash / MSYS',      f'see /c/{U}/{N}/proj/x.js'),
+            ('Silverblue /var/home', f'see /var/{H}/{N}/proj/x.js'),
+            ('UNC share',            rf'see \\fileserver\{U}\{N}\proj\x.js'),
+        ]:
+            report.check(f'hook blocks a real commit: {label}', not attempt(content))
+
+        # And these must not fire. A gate that cries wolf is one people learn to
+        # --no-verify past, which is worse than no gate at all.
+        for label, content in [
+            ('placeholder /home/you',    'clone to /home/you/earth-x-time'),
+            ('repo-relative citation',   'see src/00_head.html:336'),
+            ('relative docs/home path',  'see docs/home/index.md'),
+            ('relative assets/Users',    'see assets/Users/readme.md'),
+            ('/homebrew is not a home',  'installed under /homebrew/lib'),
+            ('bare /home directory',     'the /home directory'),
+            ('CI runner path',           'see /Users/runner/work/x'),
+        ]:
+            report.check(f'hook allows a real commit: {label}', attempt(content))
+
+        # The staged blob is what ships, not the file on disk.
+        q = os.path.join(tmp, 'q.md')
+        open(q, 'w', encoding='utf-8').write(f'see /{H}/{N}/x.js\n')
+        git('add', 'q.md')
+        open(q, 'w', encoding='utf-8').write('see src/x.js\n')   # cleaned after staging
+        rc = git('commit', '-qm', 'staged').returncode
+        git('reset', '-q', '--hard', 'HEAD'); git('clean', '-qfd')
+        report.check('hook reads the staged blob, not the worktree', rc != 0)
+
+        open(q, 'w', encoding='utf-8').write('clean\n')
+        git('add', 'q.md')
+        open(q, 'w', encoding='utf-8').write(f'see /{H}/{N}/x.js\n')   # never staged
+        rc = git('commit', '-qm', 'unstaged').returncode
+        git('reset', '-q', '--hard', 'HEAD'); git('clean', '-qfd')
+        report.check('hook ignores an unstaged worktree leak', rc == 0)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    # The repo as it stands has to pass its own gate in --all mode.
+    rc = subprocess.run([sys.executable, os.path.join(HERE, 'check_no_local_paths.py'), '--all'],
+                        cwd=ROOT, capture_output=True, text=True)
+    report.check('every tracked file passes --all', rc.returncode == 0,
+                 rc.stdout.strip().splitlines()[1].strip() if rc.returncode else 'clean')
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--url", default=None, help="test a deployed URL instead of the local build")
@@ -1246,6 +1348,7 @@ def main():
     report = Report()
     try:
         run_artifact(report)
+        run_hook(report)
         run(url, a.headed, report)
         run_mobile(url, a.headed, report)
         run_contrast(url, a.headed, report)
