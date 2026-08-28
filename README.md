@@ -114,6 +114,16 @@ labels and subject hints. It is not a source of *sourced dates*.
 Referents adopt a QID, so re-running merges instead of minting
 `deccan_traps_2` beside `deccan_traps`. Matching is by QID first, then label.
 
+The output file is a review queue, so it is merged into rather than replaced:
+ingesting one more item keeps the work already in it, and a run that ingested
+nothing refuses to write at all rather than leaving an empty file behind. It
+used to do neither — `--out` defaults to `src/ingested.json`, the write was
+unconditional, and one mistyped name emptied ten referents and exited 0.
+
+A failure to reach Wikidata is reported separately from the no-source-no-fact
+rule, and a run with any failure exits non-zero. Those are different facts: one
+is this tool's own discipline working, the other is not having looked.
+
 **What it deliberately does not do** is author the `status_timeline`. I tested
 the obvious idea — read consensus formation off citation history — and it fails:
 

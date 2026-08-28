@@ -459,8 +459,15 @@ def main():
             if r.get("wikidata"):
                 existing_by_qid[r["wikidata"]] = r["id"]
 
-    report = {"dropped": [], "needs_subjects": [], "no_geometry": [], "links": [],
-              "counts": {"referents": 0, "time_statements": 0, "with_reference": 0, "resolved": 0}}
+    # `failed` is deliberately not `dropped`. A drop is this tool's own rule
+    # working - Wikidata had a date and no reference, so no claim. A failure is
+    # the network, or a typo in the name. Filing them together means the output
+    # cannot answer "did Wikidata have nothing, or did we not look", which is
+    # the one distinction this tool exists to make.
+    report = {"dropped": [], "failed": [], "needs_subjects": [], "no_geometry": [],
+              "links": [],
+              "counts": {"requested": len(args.qids), "referents": 0,
+                         "time_statements": 0, "with_reference": 0, "resolved": 0}}
     referents, claims = [], []
     for term in args.qids:
         term = term.strip()
@@ -474,7 +481,7 @@ def main():
             ref, cls = ingest_qid(qid, existing_by_qid, existing_ids, report)
         except Exception as e:                       # noqa: BLE001
             print(f"  FAILED: {type(e).__name__}: {e}")
-            report["dropped"].append(f"{term}: fetch failed — {e}")
+            report["failed"].append(f"{term}: {type(e).__name__}: {e}")
             continue
         existing_ids.add(ref["id"])
         referents.append(ref)
@@ -489,23 +496,74 @@ def main():
             print(f"    {'':12}  doi:{c['_doi'] or '—'}  via {c['_resolved_via']}  "
                   f"cited-by {c['_cited_by']}")
 
-    out = {"referents": referents, "claims": claims, "edges": [],
+    # ------------------------------------------------------------------ write
+    # This file is a review queue - its own _note says every claim in it needs a
+    # status_timeline authored before it can be merged - so it holds work, and
+    # the run used to replace it wholesale. Ingesting one more item took it from
+    # ten referents to one, and a single mistyped name took it to zero and
+    # exited 0. Merge by referent id, and never write nothing over something.
+    prior = {"referents": [], "claims": [], "edges": []}
+    if os.path.exists(args.out):
+        try:
+            with open(args.out, encoding="utf-8") as fh:
+                loaded = json.load(fh)
+            # Readable JSON is not enough - it has to be THIS tool's file.
+            # Anything else at --out is the user pointing somewhere they did not
+            # mean to, and writing over it is the same destruction in a
+            # different costume.
+            if not isinstance(loaded, dict) or not any(
+                    isinstance(loaded.get(k), list) for k in ("referents", "claims")):
+                sys.exit(f"FATAL: {args.out} exists and is not an ingest output "
+                         f"(no `referents` or `claims` list); refusing to overwrite it. "
+                         f"Move it aside or pass --out somewhere else.")
+            for k in ("referents", "claims", "edges"):
+                if isinstance(loaded.get(k), list):
+                    prior[k] = loaded[k]
+        except (OSError, ValueError) as e:
+            sys.exit(f"FATAL: {args.out} exists but could not be read ({e}). "
+                     f"Move it aside or pass --out somewhere else; refusing to "
+                     f"overwrite a file this run cannot merge with.")
+
+    if not referents and (prior["referents"] or prior["claims"]):
+        sys.exit(f"FATAL: nothing was ingested"
+                 + (f" ({len(report['failed'])} of {len(args.qids)} item(s) failed)"
+                    if report["failed"] else "")
+                 + f"; {args.out} left untouched "
+                 f"({len(prior['referents'])} referent(s), {len(prior['claims'])} claim(s)).")
+
+    touched = {r["id"] for r in referents}
+    kept_refs = [r for r in prior["referents"] if r.get("id") not in touched]
+    kept_claims = [c for c in prior["claims"] if c.get("about") not in touched]
+    replaced = len(prior["referents"]) - len(kept_refs)
+
+    out = {"referents": kept_refs + referents,
+           "claims": kept_claims + claims,
+           "edges": prior["edges"],
            "_report": report,
            "_note": "Every claim here is _review:true with a one-entry status_timeline. "
                     "The proposed/contested/consensus arc is NOT derivable from any API "
                     "and must be authored before merging."}
-    os.makedirs(os.path.dirname(args.out), exist_ok=True)
+    os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
     json.dump(out, open(args.out, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
 
     print("\n" + "=" * 68)
     print(f"referents {len(referents)}   claims {len(claims)}   -> {args.out}")
+    print(f"  merged: {len(referents) - replaced} added, {replaced} replaced, "
+          f"{len(kept_refs)} kept from previous runs "
+          f"-> {len(out['referents'])} referent(s), {len(out['claims'])} claim(s) in the file")
     print(f"resolved by DOI: {sum(1 for c in claims if c['_resolved_via']=='doi')}   "
           f"by title search: {sum(1 for c in claims if c['_resolved_via']=='title-search')}   "
           f"Wikidata-only: {sum(1 for c in claims if c['_resolved_via']=='wikidata-only')}")
     c = report["counts"]
     pct = 100 * c["resolved"] // max(1, c["time_statements"])
+    # Say how many items were ASKED for, not just how many answered. The README
+    # quotes this line as its finding about Wikidata; a run where two of ten
+    # items 404 used to report the percentage over the eight and name the ten
+    # nowhere.
+    reach = (f"{c['referents']} of {c['requested']} items"
+             if c["referents"] != c["requested"] else f"{c['referents']} items")
     print(f"\nWIKIDATA COVERAGE: {c['time_statements']} dated statements across "
-          f"{c['referents']} items -> {c['with_reference']} carry any reference "
+          f"{reach} -> {c['with_reference']} carry any reference "
           f"-> {c['resolved']} resolve to a citation ({pct}%).")
     print("  Wikidata is dependable for identity, coordinates and labels.")
     print("  It is NOT a source of sourced dates: most date statements cite nothing.")
@@ -515,9 +573,14 @@ def main():
         for l in report["links"]:
             print("  -", l)
 
-    print(f"\nDROPPED ({len(report['dropped'])}) — mostly the no-source-no-fact rule:")
+    print(f"\nDROPPED ({len(report['dropped'])}) — the no-source-no-fact rule:")
     for d in report["dropped"][:12]:
         print("  -", d)
+    if report["failed"]:
+        print(f"\nFAILED ({len(report['failed'])}) — not a finding about the record, "
+              f"a failure to read it:")
+        for f in report["failed"]:
+            print("  -", f)
     if report["needs_subjects"]:
         print(f"\nNEEDS SUBJECTS ({len(report['needs_subjects'])}):")
         for s in report["needs_subjects"]:
@@ -527,6 +590,13 @@ def main():
     print("\nNext: author the status_timeline for each claim, then merge into "
           "src/graph.json and re-run tools/validate_graph.py.")
 
+    # A batch that half-failed is not a success. Anything driving this - a
+    # script, an agent - needs the exit code to say so; the file was written,
+    # so the successful half is not lost either way.
+    if report["failed"]:
+        return 1
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main() or 0)
