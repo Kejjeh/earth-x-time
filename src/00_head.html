@@ -1,6 +1,18 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Earth × Time</title>
+<meta name="description" content="Two orthogonal axes: when things happened, and when we found out. 275 sourced claims about Earth&#39;s history, each carrying the year someone first made it." />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Earth × Time" />
+<meta property="og:description" content="Drag the knowledge-time rail and watch the dates re-resolve. Every claim carries its source and the year it was first made." />
+<meta property="og:image" content="https://kejjeh.github.io/earth-x-time/preview.jpg" />
+<meta property="og:image:alt" content="A dark globe beside a vertical knowledge-time rail and a stratigraphic timeline." />
+<meta property="og:url" content="https://kejjeh.github.io/earth-x-time/" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Earth × Time" />
+<meta name="twitter:description" content="Drag the knowledge-time rail and watch the dates re-resolve." />
+<meta name="twitter:image" content="https://kejjeh.github.io/earth-x-time/preview.jpg" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2032%2032%27%3E%3Crect%20width%3D%2732%27%20height%3D%2732%27%20rx%3D%277%27%20fill%3D%27%230A1317%27%2F%3E%3Ccircle%20cx%3D%2716%27%20cy%3D%2717%27%20r%3D%278.5%27%20fill%3D%27none%27%20stroke%3D%27%23DDE7E7%27%20stroke-opacity%3D%27.5%27%20stroke-width%3D%271.5%27%2F%3E%3Cpath%20d%3D%27M16%203.5v25%27%20stroke%3D%27%2355A0C6%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%2F%3E%3Ccircle%20cx%3D%2716%27%20cy%3D%2711%27%20r%3D%273.2%27%20fill%3D%27%23D08A44%27%2F%3E%3C%2Fsvg%3E" />
 <style>
 /*@FONTS@*/
 
@@ -296,6 +308,35 @@ button { background: none; border: none; cursor: pointer; padding: 0; }
 .claim .stmt { margin: 4px 0 0; font-size: 11.5px; color: var(--chalk-dim); line-height: 1.5; }
 .claim .src { margin: 4px 0 0; font-size: 10.5px; color: var(--chalk-faint); line-height: 1.45; }
 .claim .src .kt { font-family: var(--font-data); color: var(--cyanotype); }
+
+/* Outbound source links. The DOI link and the "no DOI" link are deliberately
+   the same weight: an unchecked attribution is not a lesser thing to show than
+   a checked one, it is the thing a reader most needs to know about. */
+a.doi { color: var(--chalk-dim); text-decoration: underline;
+        text-decoration-color: var(--rule); text-underline-offset: 2px; }
+a.doi:hover, a.doi:focus-visible { color: var(--cyanotype);
+        text-decoration-color: var(--cyanotype); }
+a.doi:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--cyanotype); border-radius: 2px; }
+a.doi .doi-mark { font-family: var(--font-data); font-size: 8.5px; letter-spacing: .06em;
+        margin-left: 4px; padding: 0 3px; border: 1px solid var(--rule); border-radius: 2px;
+        color: var(--chalk-faint); vertical-align: 1px; }
+a.doi:hover .doi-mark, a.doi:focus-visible .doi-mark { border-color: var(--cyanotype); color: var(--cyanotype); }
+a.doi.none { color: var(--chalk-faint); font-style: italic; text-decoration-style: dotted; }
+
+/* The absent roster. Grouped by the one action that would bring a row back, so
+   the list reads as a set of things to do rather than a list of failures. */
+.absent { margin-top: 16px; border-top: 1px solid var(--rule); padding-top: 10px; }
+.absent summary { font-size: 11px; color: var(--chalk-dim); cursor: pointer;
+  list-style: none; padding: 2px 0; }
+.absent summary::-webkit-details-marker { display: none; }
+.absent summary::before { content: '▸'; display: inline-block; width: 12px;
+  color: var(--chalk-faint); transition: transform .12s ease; }
+.absent[open] summary::before { transform: rotate(90deg); }
+.absent summary:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--cyanotype); border-radius: 2px; }
+.absent-fix { margin: 10px 0 2px; font-size: 9.5px; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--chalk-faint); }
+.absent ul { margin: 0; padding: 0; list-style: none; }
+@media (prefers-reduced-motion: reduce) { .absent summary::before { transition: none; } }
 .claim .winner-flag {
   font-family: var(--font-display); text-transform: uppercase; letter-spacing: .1em;
   font-size: 9px; color: var(--ochre);
@@ -391,6 +432,17 @@ button { background: none; border: none; cursor: pointer; padding: 0; }
 .krail-foot { padding: 8px; border-top: 1px solid var(--rule); flex: none; display: flex;
   flex-direction: column; gap: 5px; }
 .krail-foot .iconbtn { width: 100%; text-align: center; }
+.krail-step { display: flex; gap: 5px; }
+.krail-step .iconbtn { padding: 5px 2px; }
+.krail-step .iconbtn:disabled { opacity: .35; cursor: default; }
+/* The readout is the rail's caption: the landmark it is standing on, and what
+   actually happened in the year under the pointer. Fixed height so the foot
+   does not jump as the text changes under a moving pointer. */
+.krail-read { margin: 0 0 2px; min-height: 42px; font-size: 9.5px; line-height: 1.35;
+  color: var(--chalk-faint); }
+.krail-read .yr { font-family: var(--font-data); color: var(--cyanotype);
+  font-size: 11px; font-weight: 600; display: block; }
+.krail-read .era { color: var(--chalk-dim); display: block; }
 
 /* ============================================================ CHRONOSTRAT */
 .chron-bar {

@@ -26,6 +26,9 @@ the filter and the selection all live in `location.hash`, so
 | Select **The Origin of Life** | Draws as a band 1.1 billion years wide, not a point. Five rival datings, solid marker for the winner, hollow ones for the rest. |
 | Switch resolver to **Newest** | 28 of the 57 referents move. Origin of life jumps from 3.43 Ga to 4.28 Ga. |
 | Double-click a **field of study** | Isolates it, and keeps the causal links that leave it. |
+| Hover the **knowledge rail**, or press **Next** | The rail names its landmarks and reports what happened in the year under the pointer — "1991 · Chicxulub is found · 7 claims first made, 2 superseded, 9 changed standing". 115 of the 376 years carry a change and the largest gap between two is 119, so Prev/Next step between them rather than leaving you to find them by dragging. |
+| With nothing selected, open **"n not on screen — and why"** | Names every referent that is not drawn and the one gate keeping it out — subject switched off, outside the window, below the zoom band, folded into a parent, or not yet claimed. Clicking one reveals it. |
+| Click a **source line** in any claim | Resolves the DOI where there is one. Where there is not — 232 of the 275 claims — it says *no DOI recorded* and offers a search, because [Known gaps](#known-gaps) admits most attributions are plausible rather than checked. |
 
 ## Structure
 
@@ -267,7 +270,10 @@ for the same numbers.
   earlier 238 did not get that treatment. The authors were told to search before
   writing and to prefer an honest vague attribution to a fabricated precise one,
   and the ten claims in `src/foundations.json` are hand-written from canonical
-  works — but treat those as plausible rather than checked.
+  works — but treat those as plausible rather than checked. The panel now says
+  this per claim rather than only here: a claim with a DOI links to it, and a
+  claim without one is labelled *no DOI recorded* beside a search that lets a
+  reader go and check it. 43 of 275 claims carry a DOI.
 - **Deep-time coordinates are modern coordinates.** Every claim carries
   `coords_are_modern: true` and the detail panel says so. Chicxulub is drawn
   where the Yucatán is now. Plate reconstruction is not implemented; the flag
