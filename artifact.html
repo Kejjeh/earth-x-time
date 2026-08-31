@@ -298,6 +298,35 @@ button { background: none; border: none; cursor: pointer; padding: 0; }
 .claim .stmt { margin: 4px 0 0; font-size: 11.5px; color: var(--chalk-dim); line-height: 1.5; }
 .claim .src { margin: 4px 0 0; font-size: 10.5px; color: var(--chalk-faint); line-height: 1.45; }
 .claim .src .kt { font-family: var(--font-data); color: var(--cyanotype); }
+
+/* Outbound source links. The DOI link and the "no DOI" link are deliberately
+   the same weight: an unchecked attribution is not a lesser thing to show than
+   a checked one, it is the thing a reader most needs to know about. */
+a.doi { color: var(--chalk-dim); text-decoration: underline;
+        text-decoration-color: var(--rule); text-underline-offset: 2px; }
+a.doi:hover, a.doi:focus-visible { color: var(--cyanotype);
+        text-decoration-color: var(--cyanotype); }
+a.doi:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--cyanotype); border-radius: 2px; }
+a.doi .doi-mark { font-family: var(--font-data); font-size: 8.5px; letter-spacing: .06em;
+        margin-left: 4px; padding: 0 3px; border: 1px solid var(--rule); border-radius: 2px;
+        color: var(--chalk-faint); vertical-align: 1px; }
+a.doi:hover .doi-mark, a.doi:focus-visible .doi-mark { border-color: var(--cyanotype); color: var(--cyanotype); }
+a.doi.none { color: var(--chalk-faint); font-style: italic; text-decoration-style: dotted; }
+
+/* The absent roster. Grouped by the one action that would bring a row back, so
+   the list reads as a set of things to do rather than a list of failures. */
+.absent { margin-top: 16px; border-top: 1px solid var(--rule); padding-top: 10px; }
+.absent summary { font-size: 11px; color: var(--chalk-dim); cursor: pointer;
+  list-style: none; padding: 2px 0; }
+.absent summary::-webkit-details-marker { display: none; }
+.absent summary::before { content: '▸'; display: inline-block; width: 12px;
+  color: var(--chalk-faint); transition: transform .12s ease; }
+.absent[open] summary::before { transform: rotate(90deg); }
+.absent summary:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--cyanotype); border-radius: 2px; }
+.absent-fix { margin: 10px 0 2px; font-size: 9.5px; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--chalk-faint); }
+.absent ul { margin: 0; padding: 0; list-style: none; }
+@media (prefers-reduced-motion: reduce) { .absent summary::before { transition: none; } }
 .claim .winner-flag {
   font-family: var(--font-display); text-transform: uppercase; letter-spacing: .1em;
   font-size: 9px; color: var(--ochre);
@@ -393,6 +422,17 @@ button { background: none; border: none; cursor: pointer; padding: 0; }
 .krail-foot { padding: 8px; border-top: 1px solid var(--rule); flex: none; display: flex;
   flex-direction: column; gap: 5px; }
 .krail-foot .iconbtn { width: 100%; text-align: center; }
+.krail-step { display: flex; gap: 5px; }
+.krail-step .iconbtn { padding: 5px 2px; }
+.krail-step .iconbtn:disabled { opacity: .35; cursor: default; }
+/* The readout is the rail's caption: the landmark it is standing on, and what
+   actually happened in the year under the pointer. Fixed height so the foot
+   does not jump as the text changes under a moving pointer. */
+.krail-read { margin: 0 0 2px; min-height: 42px; font-size: 9.5px; line-height: 1.35;
+  color: var(--chalk-faint); }
+.krail-read .yr { font-family: var(--font-data); color: var(--cyanotype);
+  font-size: 11px; font-weight: 600; display: block; }
+.krail-read .era { color: var(--chalk-dim); display: block; }
 
 /* ============================================================ CHRONOSTRAT */
 .chron-bar {
@@ -593,6 +633,13 @@ button { background: none; border: none; cursor: pointer; padding: 0; }
             aria-label="Knowledge time: the year you are reading the record from"
             aria-valuemin="1650" aria-valuemax="2026" aria-valuenow="2026"></canvas>
     <div class="krail-foot">
+      <p class="krail-read" id="krail-read"></p>
+      <div class="krail-step">
+        <button class="iconbtn" id="btn-prev" title="Previous year in which anything changes"
+                aria-label="Previous year in which anything changes">Prev</button>
+        <button class="iconbtn" id="btn-next" title="Next year in which anything changes"
+                aria-label="Next year in which anything changes">Next</button>
+      </div>
       <button class="iconbtn" id="btn-play" aria-pressed="false">Replay</button>
       <button class="iconbtn" id="btn-now">2026</button>
     </div>
@@ -1177,22 +1224,50 @@ let FACTS = null;
 function invalidate() { FACTS = null; }
 function facts() { return FACTS || (FACTS = queryFacts(S)); }
 
+/* ------------------------------------------------------- the named landmarks
+   These nine years were a ladder of `else if` thresholds inside
+   epistemicCaption, which meant the product knew exactly where its interesting
+   years were and the control that reaches them - the knowledge rail - did not.
+   At rest the rail was seven bare fifty-year numbers beside an unlabelled grey
+   shape, and a visitor dragging it was as likely to land on 1740, where nothing
+   moves, as on 1980, where the page changes.
+
+   One table now, read by both: the caption picks the last era at or below kt,
+   and 60_krail.js draws a tick per era and names it in the hover readout. Add a
+   landmark here and it appears in both places, or in neither. */
+const KT_ERAS = [
+  { from: KT_MIN, name: 'Before anyone is counting',
+    caption: 'The Earth has a history, but almost no one is counting it in years yet.' },
+  { from: 1700, name: 'Strata read as a sequence',
+    caption: 'Strata are understood to record a sequence. Their length is anyone’s guess.' },
+  { from: 1800, name: 'Deep time accepted',
+    caption: 'Deep time is accepted. Nothing can yet put a number on it.' },
+  { from: 1862, name: 'Kelvin’s ceiling',
+    caption: 'Physics says the Earth is under 100 million years old, and physics is winning.' },
+  { from: 1907, name: 'Radioactivity breaks the ceiling',
+    caption: 'Radioactivity has broken Kelvin’s ceiling; the age of the Earth is climbing.' },
+  { from: 1956, name: 'The Earth is 4.55 billion years old',
+    caption: 'The planet is 4.55 billion years old. Extinctions are still thought to be gradual.' },
+  { from: 1980, name: 'An asteroid is proposed',
+    caption: 'An asteroid has been proposed for the K–Pg extinction. Most palaeontologists are unconvinced.' },
+  { from: 1991, name: 'Chicxulub is found',
+    caption: 'Chicxulub has been found. The impact hypothesis has hardened into consensus.' },
+  { from: 2000, name: 'Clovis-first collapses',
+    caption: 'Clovis-first is collapsing, and the Deccan Traps are back in the K–Pg argument.' },
+  { from: 2015, name: 'Pre-Clovis accepted',
+    caption: 'Pre-Clovis sites are accepted, the Anthropocene has been proposed and rejected.' }
+];
+
+function eraAt(kt) {
+  let hit = KT_ERAS[0];
+  for (const e of KT_ERAS) if (kt >= e.from) hit = e;
+  return hit;
+}
+
 /* --------------------------------------------------- the rewriting caption */
 function epistemicCaption() {
   const F = facts();
-  const kt = S.kt;
-  const bits = [];
-
-  if (kt < 1700) bits.push('The Earth has a history, but almost no one is counting it in years yet.');
-  else if (kt < 1800) bits.push('Strata are understood to record a sequence. Their length is anyone’s guess.');
-  else if (kt < 1862) bits.push('Deep time is accepted. Nothing can yet put a number on it.');
-  else if (kt < 1907) bits.push('Physics says the Earth is under 100 million years old, and physics is winning.');
-  else if (kt < 1956) bits.push('Radioactivity has broken Kelvin’s ceiling; the age of the Earth is climbing.');
-  else if (kt < 1980) bits.push('The planet is 4.55 billion years old. Extinctions are still thought to be gradual.');
-  else if (kt < 1991) bits.push('An asteroid has been proposed for the K–Pg extinction. Most palaeontologists are unconvinced.');
-  else if (kt < 2000) bits.push('Chicxulub has been found. The impact hypothesis has hardened into consensus.');
-  else if (kt < 2015) bits.push('Clovis-first is collapsing, and the Deccan Traps are back in the K–Pg argument.');
-  else bits.push('Pre-Clovis sites are accepted, the Anthropocene has been proposed and rejected.');
+  const bits = [eraAt(S.kt).caption];
 
   const n = F.visible.length, d = F.disputedCount;
   bits.push(`${n} of ${Object.keys(R.referents).length} subjects visible, ${d} of them still disputed.`);
@@ -2180,6 +2255,84 @@ const KT_PIPS = (() => {
 })();
 const KT_PIP_MAX = Math.max(...KT_PIPS.map(p => p[1]));
 
+/* Every year in which anything at all changes: a claim arrives, or a claim's
+   standing moves. 115 of them, from 1669, and the largest gap between two is
+   119 years - which is why dragging blind lands on nothing so often, and why
+   the foot has a pair of buttons that step between them. */
+const KT_CHANGES = (() => {
+  const yrs = new Set();
+  for (const c of GRAPH.claims) {
+    yrs.add(c.knowledge_time);
+    for (const e of (c.status_timeline || [])) yrs.add(e.knowledge_time);
+  }
+  return [...yrs].filter(y => y >= KT_MIN && y <= KT_MAX).sort((a, b) => a - b);
+})();
+
+/* What actually happened in each of those years, precomputed once.
+   Links are counted from GRAPH.edges through the knowledge_time of the claim
+   that asserts each edge - not from status_timeline entries. A status
+   transition is a claim hardening or being retired; it is not an edge
+   appearing, and counting it as one would overstate every year in which the
+   literature merely changed its mind. */
+const KT_YEAR = (() => {
+  const m = new Map();
+  const at = y => m.get(y) || (m.set(y, { claims: 0, links: 0, superseded: 0, restanding: 0 }), m.get(y));
+  for (const c of GRAPH.claims) {
+    at(c.knowledge_time).claims++;
+    for (const e of (c.status_timeline || [])) {
+      /* Every transition is counted, not only the withdrawals. Counting the
+         supersessions alone left years like 2026 - where a claim hardens but
+         nothing is retired - in KT_CHANGES, so Next would step to a year the
+         readout then described as "nothing changes this year". The rail cannot
+         say two different things about the same year. */
+      if (e.knowledge_time === c.knowledge_time) continue;   // the arrival, already counted
+      if (e.status === 'superseded') at(e.knowledge_time).superseded++;
+      else at(e.knowledge_time).restanding++;
+    }
+  }
+  for (const e of GRAPH.edges) {
+    const c = R.claims[e.claim_id];
+    if (c) at(c.knowledge_time).links++;
+  }
+  return m;
+})();
+
+/* 46 supersessions over 23 years, rendered nowhere until now: KT_PIPS shows
+   arrivals only, so the rail displayed knowledge arriving and never knowledge
+   being withdrawn - on a page whose whole argument is that the record rewrites
+   itself. They get the far-left column: the density bars grow leftward from the
+   spine and reach x≈29 at their widest in a 104px rail, and the right channel
+   is already spoken for by the selected-claim pips at spine+3 and the tick
+   labels at spine+8. */
+const KT_SUPERSEDED = [...KT_YEAR.entries()]
+  .filter(([, v]) => v.superseded > 0)
+  .map(([y, v]) => [y, v.superseded])
+  .sort((a, b) => a[0] - b[0]);
+const KT_SUP_MAX = Math.max(1, ...KT_SUPERSEDED.map(p => p[1]));
+
+function nextChange(from, dir) {
+  if (dir > 0) {
+    for (const y of KT_CHANGES) if (y > from) return y;
+    return null;
+  }
+  for (let i = KT_CHANGES.length - 1; i >= 0; i--) if (KT_CHANGES[i] < from) return KT_CHANGES[i];
+  return null;
+}
+
+/* "1980 · 6 claims first made, 1 link wired". A bare pointermove is new here -
+   both rails were pointerdown / move-guarded-by-drag / up / cancel, so hovering
+   a grey pip told you nothing at all. */
+function railReadout(kt) {
+  const v = KT_YEAR.get(kt);
+  const era = eraAt(kt);
+  const parts = [];
+  if (v && v.claims) parts.push(`${v.claims} claim${v.claims === 1 ? '' : 's'} first made`);
+  if (v && v.links) parts.push(`${v.links} link${v.links === 1 ? '' : 's'} wired`);
+  if (v && v.superseded) parts.push(`${v.superseded} superseded`);
+  if (v && v.restanding) parts.push(`${v.restanding} changed standing`);
+  return { year: kt, era: era.name, detail: parts.join(', ') || 'nothing changes this year' };
+}
+
 function drawKrail() {
   kx.clearRect(0, 0, KW, KH);
   const spine = KW * 0.62;
@@ -2207,6 +2360,15 @@ function drawKrail() {
     }
   }
 
+  // knowledge withdrawn, far-left column, clear of the density bars
+  for (const [yr, n] of KT_SUPERSEDED) {
+    const py = ktToY(yr);
+    const h = 1.6 + (n / KT_SUP_MAX) * 2.6;
+    kx.fillStyle = withAlpha(yr <= S.kt ? CSSV.ochre : CSSV['chalk-faint'],
+                             yr <= S.kt ? 0.75 : 0.18);
+    kx.fillRect(0, py - h / 2, 3.5, h);
+  }
+
   // spine
   kx.strokeStyle = withAlpha(CSSV.cyanotype, 0.35); kx.lineWidth = 1;
   kx.beginPath(); kx.moveTo(spine + 0.5, KPAD); kx.lineTo(spine + 0.5, KH - KPAD); kx.stroke();
@@ -2215,13 +2377,29 @@ function drawKrail() {
   // The first round fifty at or after KT_MIN. Starting at a literal 1650 drew
   // every tick below the floor outside the canvas - ktToY(1650) is 827px in a
   // 737px rail once KT_MIN moves up.
-  kx.font = '400 9px xt-mono, monospace';
+  //
+  // The fifties are the scale and no longer the labels: seven bare round
+  // numbers told a reader where the rail's middle was and nothing about where
+  // its argument turns. They stay as unlabelled minor marks; the labels go to
+  // the years in KT_ERAS, which are the years the page has something to say
+  // about. Both still draw a four-digit year inside the canvas, which is what
+  // the rail-tick check measures.
   for (let yr = Math.ceil(KT_MIN / 50) * 50; yr <= KT_MAX; yr += 50) {
     const py = ktToY(yr);
-    kx.strokeStyle = withAlpha(CSSV['chalk-faint'], 0.45);
-    kx.beginPath(); kx.moveTo(spine + 0.5, py); kx.lineTo(spine + 5, py); kx.stroke();
-    kx.fillStyle = CSSV['chalk-faint'];
-    kx.fillText(String(yr), spine + 8, py + 3);
+    kx.strokeStyle = withAlpha(CSSV['chalk-faint'], 0.3);
+    kx.beginPath(); kx.moveTo(spine + 0.5, py); kx.lineTo(spine + 3.5, py); kx.stroke();
+  }
+
+  kx.font = '400 9px xt-mono, monospace';
+  for (const era of KT_ERAS) {
+    if (era.from <= KT_MIN || era.from > KT_MAX) continue;
+    const py = ktToY(era.from);
+    const on = era.from <= S.kt;
+    kx.strokeStyle = withAlpha(on ? CSSV.cyanotype : CSSV['chalk-faint'], on ? 0.75 : 0.4);
+    kx.lineWidth = 1;
+    kx.beginPath(); kx.moveTo(spine + 0.5, py); kx.lineTo(spine + 6, py); kx.stroke();
+    kx.fillStyle = on ? CSSV['chalk-dim'] : CSSV['chalk-faint'];
+    kx.fillText(String(era.from), spine + 9, py + 3);
   }
 
   // handle
@@ -2301,6 +2479,44 @@ const RESOLVER_NOTE = {
   spread: 'Nothing is resolved. Every surviving claim is drawn at once, and the width of the band is the size of the disagreement.'
 };
 
+/* ------------------------------------------------------- following a source
+   The panel header promises that nothing shows a date without showing who said
+   so, and until now "who said so" was a dead string: 43 non-null DOIs were
+   decoded into R.claims and read by nothing, and the page had no outbound
+   anchor anywhere in its source tree.
+
+   The half without a DOI is the more honest half. README's Known gaps says only
+   the 37 causal-graph claims went through an adversarial citation pass and the
+   other 238 are "plausible rather than checked", so a claim with no DOI gets
+   said so, out loud, with a search that lets a reader go and check it. That is
+   the site auditing itself rather than asking to be trusted.
+
+   encodeURI, not encodeURIComponent: a DOI is a path and its slash has to
+   survive. One DOI in the set - Hildebrand 1991, which is the README's own
+   headline example - carries `<`, `>` and `;`, and encodeURI escapes the two
+   angle brackets while leaving the semicolon and the parens that doi.org
+   resolves as-is. encodeURIComponent would escape the slash and 404. */
+function doiHref(doi) {
+  return 'https://doi.org/' + encodeURI(String(doi));
+}
+
+function searchHref(c) {
+  return 'https://scholar.google.com/scholar?q=' +
+    encodeURIComponent(String(c.asserted_by || '') + ' ' + String(c.statement || '').slice(0, 120));
+}
+
+/* rel="noopener": these open in a new tab, and the opener reference would give
+   an unrelated origin a handle on this window. */
+function sourceLink(c) {
+  const who = esc(c.asserted_by);
+  if (c.doi) {
+    return `<a class="doi" href="${esc(doiHref(c.doi))}" target="_blank" rel="noopener noreferrer"
+      title="Resolve ${esc(c.doi)} at doi.org">${who}<span class="doi-mark">DOI</span></a>`;
+  }
+  return `${who} <a class="doi none" href="${esc(searchHref(c))}" target="_blank" rel="noopener noreferrer"
+    title="No DOI is recorded for this claim. Search for it.">no DOI recorded — search</a>`;
+}
+
 function statusPill(st) {
   return `<span class="st st-${st}">${st}</span>`;
 }
@@ -2323,7 +2539,7 @@ function claimBlock(l, isWinner, kt) {
       ${isWinner ? '<span class="winner-flag">resolved to this</span>' : ''}
     </div>
     <p class="stmt">${esc(c.statement)}</p>
-    <p class="src">${esc(c.asserted_by)} · first asserted <span class="kt num">${c.knowledge_time}</span></p>
+    <p class="src">${sourceLink(c)} · first asserted <span class="kt num">${c.knowledge_time}</span></p>
     <ul class="hist">${hist}</ul>
   </div>`;
 }
@@ -2341,6 +2557,89 @@ function edgeLink(ed, dir) {
       <span class="mech">${esc(ed.edge.label)} · ${esc(ed.claim.asserted_by)} · ${ed.status} since ${ed.since}</span>
     </span>
   </button>`;
+}
+
+/* --------------------------------------------------- why something is absent
+   epistemicCaption ends "24 of 57 subjects visible" and stops there. queryFacts
+   already knows why each of the other 33 is not on screen - it keeps inWindow,
+   subjectOn, zoomOK, inFocus and aggregatedInto per referent and then collapses
+   all of them into one boolean - so the reasons were computed and thrown away
+   on every query. Search was the only way to reach a hidden referent, and it
+   requires knowing the name first.
+
+   The order below is precedence, not preference: a referent can fail several
+   gates at once and the first one is the one a reader can act on. "Not asserted
+   yet" comes first because such a referent is not in F.items at all - resolve()
+   returned null and the loop skipped it - so it has no flags to read. */
+function absenceReason(id, F) {
+  const it = F.items[id];
+  if (!it) {
+    const first = firstDatedYear(id);
+    return isFinite(first)
+      ? { key: 'unasserted', why: `not claimed until ${first}`, fix: 'Move knowledge-time forward' }
+      : { key: 'unasserted', why: 'nothing datable is claimed about it', fix: null };
+  }
+  if (it.aggregatedInto) {
+    const parent = R.referents[it.aggregatedInto];
+    return { key: 'rolled', why: `counted inside ${parent ? parent.label : it.aggregatedInto}`,
+             fix: 'Zoom in to separate it' };
+  }
+  if (!it.subjectOn) {
+    const off = it.res.subjects.map(s => SUBJECT_LABEL[s] || s);
+    return { key: 'subject', why: `${off.join(' / ')} is switched off`, fix: 'Turn the subject back on' };
+  }
+  if (!it.inWindow) {
+    return { key: 'window', why: `dated ${fmtYbp(it.res.pos)}, outside the window`, fix: 'Widen the window' };
+  }
+  if (!it.zoomOK) {
+    return { key: 'zoom', why: 'below the zoom band at this width', fix: 'Zoom in' };
+  }
+  if (!it.inFocus) {
+    return { key: 'focus', why: `isolated away by ${SUBJECT_LABEL[S.focus] || S.focus}`, fix: 'Clear the isolation' };
+  }
+  return { key: 'other', why: 'not drawn', fix: null };
+}
+
+/* Clicking a row goes through chooseResult, which is the same path search uses:
+   it advances knowledge-time to the first dated year, re-enables the subject,
+   clears an isolation and widens the window only when the target is genuinely
+   outside it. Worth saying plainly, because the zoom gate is passed by neither
+   of those - it is passed by the `|| A.selection === id` override in
+   queryFacts, which chooseResult reaches by setting the selection. A reader who
+   assumes the window widening is what reveals a deep-time referent will build
+   the wrong thing: a 66 Ma referent with zoomMin 7 in a res.oldest * 1.7 window
+   sits at z about 1.9 and would stay hidden without the override. */
+function renderAbsent() {
+  const F = facts();
+  const shown = new Set(F.visible.map(i => i.id));
+  const rows = [];
+  for (const id in R.referents) {
+    if (shown.has(id)) continue;
+    rows.push({ id, label: R.referents[id].label, ...absenceReason(id, F) });
+  }
+  if (!rows.length) return '';
+
+  const RANK = { subject: 0, focus: 1, window: 2, zoom: 3, rolled: 4, unasserted: 5, other: 6 };
+  rows.sort((a, b) => (RANK[a.key] - RANK[b.key]) || a.label.localeCompare(b.label));
+
+  const groups = [];
+  for (const r of rows) {
+    const last = groups[groups.length - 1];
+    if (last && last.fix === r.fix) last.rows.push(r);
+    else groups.push({ fix: r.fix, rows: [r] });
+  }
+
+  return `
+    <details class="absent">
+      <summary>${rows.length} not on screen — and why</summary>
+      ${groups.map(g => `
+        ${g.fix ? `<p class="absent-fix">${esc(g.fix)}</p>` : ''}
+        <ul>${g.rows.map(r => `
+          <li><button class="edge-link" data-goto="${esc(r.id)}" style="padding:2px 0">
+            <span><span class="who">${esc(r.label)}</span>
+            <span class="mech">${esc(r.why)}</span></span>
+          </button></li>`).join('')}</ul>`).join('')}
+    </details>`;
 }
 
 function renderDetail() {
@@ -2383,7 +2682,7 @@ function renderDetail() {
         <span class="lbl">What is still to come · ${pending.length}</span>
         ${pending.slice(0, 8).map(c => `<div class="claim pending" style="--cl:var(--rule)">
           <p class="stmt">${esc(c.statement)}</p>
-          <p class="src">${esc(c.asserted_by)} — arrives in <span class="kt num">${c.knowledge_time}</span></p>
+          <p class="src">${sourceLink(c)} — arrives in <span class="kt num">${c.knowledge_time}</span></p>
         </div>`).join('')}
       </div>` : ''}`;
     return;
@@ -2404,6 +2703,7 @@ function renderDetail() {
             <span><span class="who">${esc(i.ref.label)}</span>
             <span class="mech">${fmtSpan(i.res.oldest - i.res.youngest)} of disagreement</span></span>
           </button></li>`).join('')}</ul>` : ''}
+        ${renderAbsent()}
       </div>`;
     return;
   }
@@ -2454,7 +2754,7 @@ function renderDetail() {
       <div class="big">${dateLine} ${prec ? `<span class="pm">${prec}</span>` : ''}</div>
       ${r.winner ? `
         <p class="prov">Resolved by <b>${esc(S.resolver === 'frontier' ? 'newest claim' : 'best supported')}</b>
-        to <b>${esc(r.winner.claim.asserted_by)}</b>, ${r.winner.status} since <b>${r.winner.since}</b>.
+        to <b>${sourceLink(r.winner.claim)}</b>, ${r.winner.status} since <b>${r.winner.since}</b>.
         ${r.dated.length > 1 ? `${r.dated.length - 1} competing claim${r.dated.length > 2 ? 's' : ''} below.` : ''}</p>`
         : `<p class="prov">Not resolved. Showing the full range of ${r.dated.length} surviving claims.</p>`}
       ${r.disputed ? `<p class="spread-note">Disputed — ${fmtSpan(r.oldest - r.youngest)} between the outermost claims.</p>` : ''}
@@ -2483,7 +2783,7 @@ function renderDetail() {
       ${pending.map(c => `<div class="claim pending" style="--cl:var(--rule)">
         <div class="row1"><span class="date num">${fmtYbp(c.earth_time_start)}</span></div>
         <p class="stmt">${esc(c.statement)}</p>
-        <p class="src">${esc(c.asserted_by)} — arrives in <span class="kt num">${c.knowledge_time}</span></p>
+        <p class="src">${sourceLink(c)} — arrives in <span class="kt num">${c.knowledge_time}</span></p>
       </div>`).join('')}
     </div>` : ''}
 
@@ -3309,6 +3609,53 @@ kcv.addEventListener('pointerup', e => {
   kDrag = false;
 });
 kcv.addEventListener('pointercancel', () => { kDrag = false; });
+/* ------------------------------------------------- the rail's hover readout
+   A bare pointermove, which neither rail had: both were pointerdown /
+   move-guarded-by-drag / up / cancel, so a grey pip under the cursor said
+   nothing. Hovering now names the landmark and what happened in that year,
+   which is what turns the rail from a numeric scale into a table of contents.
+   While dragging, the readout follows the value being set rather than the
+   pointer, so it never disagrees with the year in the header. */
+const elRailRead = document.getElementById('krail-read');
+let railHoverKt = null;
+
+function paintRailRead() {
+  if (!elRailRead) return;
+  const r = railReadout(railHoverKt == null ? S.kt : railHoverKt);
+  elRailRead.innerHTML =
+    `<span class="yr">${r.year}</span><span class="era">${esc(r.era)}</span>${esc(r.detail)}`;
+}
+
+kcv.addEventListener('pointermove', e => {
+  if (kDrag) { railHoverKt = null; paintRailRead(); return; }
+  if (e.pointerType === 'touch') return;
+  const r = kcv.getBoundingClientRect();
+  railHoverKt = yToKt(e.clientY - r.top);
+  paintRailRead();
+});
+kcv.addEventListener('pointerleave', () => { railHoverKt = null; paintRailRead(); });
+kcv.addEventListener('blur', () => { railHoverKt = null; paintRailRead(); });
+
+/* Step to the next year in which anything actually changes. 115 such years
+   across a 376-year rail, and the largest gap between two of them is 119
+   years - so a reader dragging blind spends most of the rail on nothing. */
+function stepChange(dir) {
+  stopReplay();
+  const y = nextChange(S.kt, dir);
+  if (y == null) return;
+  railHoverKt = null;
+  setKt(y);
+  paintRailRead();
+}
+document.getElementById('btn-prev').addEventListener('click', () => stepChange(-1));
+document.getElementById('btn-next').addEventListener('click', () => stepChange(1));
+
+function syncRailButtons() {
+  document.getElementById('btn-prev').disabled = nextChange(S.kt, -1) == null;
+  document.getElementById('btn-next').disabled = nextChange(S.kt, 1) == null;
+  if (railHoverKt == null) paintRailRead();
+}
+
 kcv.addEventListener('keydown', e => {
   const step = e.shiftKey ? 25 : 1;
   if (e.key === 'ArrowUp' || e.key === 'ArrowRight') setKt(S.kt + step);
@@ -3560,6 +3907,7 @@ function render(dt) {
     renderDetail(); renderSubjects();
     document.getElementById('asof-year').textContent = S.kt;
     document.getElementById('krail-year').textContent = S.kt;
+    syncRailButtons();
     document.getElementById('epistemic').textContent = epistemicCaption();
     const span = S.win.t1 - S.win.t0;
     document.getElementById('rd-window').textContent =

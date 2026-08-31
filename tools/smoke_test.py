@@ -1328,6 +1328,160 @@ def run_hook(report):
                  rc.stdout.strip().splitlines()[1].strip() if rc.returncode else 'clean')
 
 
+def run_features(url, headed, report):
+    """The knowledge rail as a table of contents, the absent roster, and the
+    outbound source links - the three things a reader uses to find their way
+    around rather than to operate the page."""
+    from playwright.sync_api import sync_playwright
+
+    print("\n  -- rail landmarks, absent roster, source links --", flush=True)
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=not headed)
+        page = browser.new_page(viewport={"width": 1440, "height": 900})
+        errs = []
+        page.on("pageerror", lambda e: errs.append(str(e)))
+        page.goto(url, wait_until="load", timeout=45000)
+        page.wait_for_timeout(2200)
+        try:
+            # ---------------------------------------- the rail names its years
+            # One table feeds the caption and the rail. If they ever disagree,
+            # the page is telling a reader that 1991 matters while the control
+            # that reaches 1991 stays silent about it.
+            eras = page.evaluate("() => KT_ERAS.map(e => e.from)")
+            labels = page.evaluate("""() => {
+              const c = document.getElementById('krailcv').getContext('2d');
+              const real = c.fillText.bind(c); const seen = [];
+              c.fillText = function (t, x, y) { seen.push(t); return real(t, x, y); };
+              needKrail = true; drawKrail(); c.fillText = real;
+              return seen.filter(t => /^\\d{4}$/.test(t)).map(Number);
+            }""")
+            want = [y for y in eras if y > page.evaluate("KT_MIN")]
+            report.check("the rail labels every landmark the caption knows about",
+                         sorted(labels) == sorted(want), f"drawn {labels}")
+
+            cap = page.evaluate("() => [eraAt(1991).caption, epistemicCaption()]")
+            report.check("the caption is read from the same landmark table",
+                         cap[0].startswith('Chicxulub'), cap[0][:48])
+
+            # ------------------------- stepping lands only on years that change
+            steps = page.evaluate("""() => {
+              const out = []; setKt(KT_MAX);
+              for (let i = 0; i < 12; i++) {
+                const before = S.kt;
+                document.getElementById('btn-prev').click();
+                if (S.kt === before) break;
+                out.push(S.kt);
+              }
+              return { years: out, allReal: out.every(y => KT_CHANGES.includes(y)) };
+            }""")
+            report.check("Prev steps only onto years in which something changes",
+                         len(steps["years"]) >= 8 and steps["allReal"], str(steps["years"][:8]))
+
+            # The rail must not say two different things about one year: a year
+            # Next can reach is a year the readout has something to report.
+            silent = page.evaluate(
+                "() => KT_CHANGES.filter(y => railReadout(y).detail === 'nothing changes this year')")
+            report.check("every year the rail steps to has something to report",
+                         silent == [], f"{len(silent)} silent: {silent[:6]}")
+
+            # Links come from GRAPH.edges via the asserting claim's year, never
+            # from a status transition - a claim hardening is not a link.
+            links = page.evaluate("""() => {
+              let total = 0; for (const v of KT_YEAR.values()) total += v.links;
+              return { total, edges: GRAPH.edges.length };
+            }""")
+            report.check("the rail counts links from edges, not from transitions",
+                         links["total"] == links["edges"], json.dumps(links))
+
+            sup = page.evaluate("() => KT_SUPERSEDED.reduce((a, p) => a + p[1], 0)")
+            report.check("knowledge being withdrawn is drawn at all", sup > 0, f"{sup} supersessions")
+
+            # -------------------------------------- hovering does not set the year
+            page.evaluate("() => { setKt(1900); }")
+            b = page.evaluate("""() => { const r = document.getElementById('krailcv')
+              .getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height * 0.3]; }""")
+            page.mouse.move(b[0], b[1])
+            page.wait_for_timeout(150)
+            hov = page.evaluate("""() => ({ kt: S.kt,
+              read: document.getElementById('krail-read').innerText.trim() })""")
+            report.check("hovering the rail reads out without moving the year",
+                         hov["kt"] == 1900 and len(hov["read"]) > 8, json.dumps(hov)[:110])
+
+            # ------------------------------------------- the absent are named
+            page.evaluate("() => { setKt(KT_MAX); setSelection(null); }")
+            page.wait_for_timeout(400)
+            ros = page.evaluate("""() => {
+              const F = facts(), el = document.querySelector('.absent');
+              const rows = el ? [...el.querySelectorAll('[data-goto]')] : [];
+              return {
+                total: Object.keys(R.referents).length,
+                visible: F.visible.length,
+                rows: rows.length,
+                reasoned: rows.filter(r => (r.querySelector('.mech') || {}).textContent).length
+              };
+            }""")
+            report.check("every referent is either on screen or named as absent",
+                         ros["visible"] + ros["rows"] == ros["total"], json.dumps(ros))
+            report.check("every absent referent says why it is absent",
+                         ros["rows"] > 0 and ros["reasoned"] == ros["rows"], json.dumps(ros))
+
+            # #subjects stays exactly six chips - the roster is not rendered there
+            report.check("the roster did not land in the subject chips",
+                         page.evaluate("document.getElementById('subjects').children.length") == 6)
+
+            # clicking an absent row actually brings it back
+            hop = page.evaluate("""() => {
+              document.querySelector('.absent').open = true;
+              const b = document.querySelector('.absent [data-goto]');
+              return b ? b.dataset.goto : null;
+            }""")
+            page.click(".absent [data-goto]")
+            page.wait_for_timeout(1500)
+            got = page.evaluate("""() => { const F = facts();
+              return { sel: S.selection, vis: !!(F.items[S.selection] && F.items[S.selection].visible) }; }""")
+            report.check("clicking an absent referent reveals it",
+                         got["sel"] == hop and got["vis"], json.dumps(got))
+
+            # ------------------------------------------------ following a source
+            # One DOI in the set carries `<`, `>` and `;`. encodeURI escapes the
+            # angle brackets and leaves the slash, so doi.org resolves it;
+            # encodeURIComponent would escape the slash and 404.
+            doi = page.evaluate("""() => {
+              const c = Object.values(R.claims).find(c => /[<>]/.test(c.doi || ''));
+              return c ? { raw: c.doi, href: doiHref(c.doi) } : null;
+            }""")
+            report.check("a DOI with angle brackets still resolves",
+                         doi and doi["href"].startswith("https://doi.org/10.")
+                         and "%3C" in doi["href"] and "<" not in doi["href"]
+                         and doi["href"].count("/") == 4,
+                         doi["href"] if doi else "no such DOI")
+
+            page.evaluate("""() => {
+              const id = Object.values(R.claims).find(c => c.doi).about;
+              setKt(KT_MAX); setSelection(id);
+            }""")
+            page.wait_for_timeout(500)
+            anchors = page.evaluate("""() => {
+              const a = [...document.querySelectorAll('#detail a.doi')];
+              return {
+                n: a.length,
+                doi: a.filter(x => x.href.startsWith('https://doi.org/')).length,
+                none: a.filter(x => x.classList.contains('none')).length,
+                safe: a.every(x => (x.rel || '').includes('noopener') && x.target === '_blank')
+              };
+            }""")
+            report.check("the panel links out to the source at all",
+                         anchors["n"] > 0 and anchors["doi"] > 0, json.dumps(anchors))
+            report.check("a claim with no DOI says so and offers a search",
+                         anchors["none"] > 0, json.dumps(anchors))
+            report.check("every outbound link is rel=noopener in a new tab",
+                         anchors["safe"], json.dumps(anchors))
+
+            report.check("no page errors while exercising all three", errs == [], "; ".join(errs)[:150])
+        finally:
+            browser.close()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--url", default=None, help="test a deployed URL instead of the local build")
@@ -1352,6 +1506,7 @@ def main():
         run(url, a.headed, report)
         run_mobile(url, a.headed, report)
         run_contrast(url, a.headed, report)
+        run_features(url, a.headed, report)
     finally:
         if httpd:
             httpd.shutdown()

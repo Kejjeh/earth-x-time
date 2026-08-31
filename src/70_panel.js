@@ -39,6 +39,44 @@ const RESOLVER_NOTE = {
   spread: 'Nothing is resolved. Every surviving claim is drawn at once, and the width of the band is the size of the disagreement.'
 };
 
+/* ------------------------------------------------------- following a source
+   The panel header promises that nothing shows a date without showing who said
+   so, and until now "who said so" was a dead string: 43 non-null DOIs were
+   decoded into R.claims and read by nothing, and the page had no outbound
+   anchor anywhere in its source tree.
+
+   The half without a DOI is the more honest half. README's Known gaps says only
+   the 37 causal-graph claims went through an adversarial citation pass and the
+   other 238 are "plausible rather than checked", so a claim with no DOI gets
+   said so, out loud, with a search that lets a reader go and check it. That is
+   the site auditing itself rather than asking to be trusted.
+
+   encodeURI, not encodeURIComponent: a DOI is a path and its slash has to
+   survive. One DOI in the set - Hildebrand 1991, which is the README's own
+   headline example - carries `<`, `>` and `;`, and encodeURI escapes the two
+   angle brackets while leaving the semicolon and the parens that doi.org
+   resolves as-is. encodeURIComponent would escape the slash and 404. */
+function doiHref(doi) {
+  return 'https://doi.org/' + encodeURI(String(doi));
+}
+
+function searchHref(c) {
+  return 'https://scholar.google.com/scholar?q=' +
+    encodeURIComponent(String(c.asserted_by || '') + ' ' + String(c.statement || '').slice(0, 120));
+}
+
+/* rel="noopener": these open in a new tab, and the opener reference would give
+   an unrelated origin a handle on this window. */
+function sourceLink(c) {
+  const who = esc(c.asserted_by);
+  if (c.doi) {
+    return `<a class="doi" href="${esc(doiHref(c.doi))}" target="_blank" rel="noopener noreferrer"
+      title="Resolve ${esc(c.doi)} at doi.org">${who}<span class="doi-mark">DOI</span></a>`;
+  }
+  return `${who} <a class="doi none" href="${esc(searchHref(c))}" target="_blank" rel="noopener noreferrer"
+    title="No DOI is recorded for this claim. Search for it.">no DOI recorded — search</a>`;
+}
+
 function statusPill(st) {
   return `<span class="st st-${st}">${st}</span>`;
 }
@@ -61,7 +99,7 @@ function claimBlock(l, isWinner, kt) {
       ${isWinner ? '<span class="winner-flag">resolved to this</span>' : ''}
     </div>
     <p class="stmt">${esc(c.statement)}</p>
-    <p class="src">${esc(c.asserted_by)} · first asserted <span class="kt num">${c.knowledge_time}</span></p>
+    <p class="src">${sourceLink(c)} · first asserted <span class="kt num">${c.knowledge_time}</span></p>
     <ul class="hist">${hist}</ul>
   </div>`;
 }
@@ -79,6 +117,89 @@ function edgeLink(ed, dir) {
       <span class="mech">${esc(ed.edge.label)} · ${esc(ed.claim.asserted_by)} · ${ed.status} since ${ed.since}</span>
     </span>
   </button>`;
+}
+
+/* --------------------------------------------------- why something is absent
+   epistemicCaption ends "24 of 57 subjects visible" and stops there. queryFacts
+   already knows why each of the other 33 is not on screen - it keeps inWindow,
+   subjectOn, zoomOK, inFocus and aggregatedInto per referent and then collapses
+   all of them into one boolean - so the reasons were computed and thrown away
+   on every query. Search was the only way to reach a hidden referent, and it
+   requires knowing the name first.
+
+   The order below is precedence, not preference: a referent can fail several
+   gates at once and the first one is the one a reader can act on. "Not asserted
+   yet" comes first because such a referent is not in F.items at all - resolve()
+   returned null and the loop skipped it - so it has no flags to read. */
+function absenceReason(id, F) {
+  const it = F.items[id];
+  if (!it) {
+    const first = firstDatedYear(id);
+    return isFinite(first)
+      ? { key: 'unasserted', why: `not claimed until ${first}`, fix: 'Move knowledge-time forward' }
+      : { key: 'unasserted', why: 'nothing datable is claimed about it', fix: null };
+  }
+  if (it.aggregatedInto) {
+    const parent = R.referents[it.aggregatedInto];
+    return { key: 'rolled', why: `counted inside ${parent ? parent.label : it.aggregatedInto}`,
+             fix: 'Zoom in to separate it' };
+  }
+  if (!it.subjectOn) {
+    const off = it.res.subjects.map(s => SUBJECT_LABEL[s] || s);
+    return { key: 'subject', why: `${off.join(' / ')} is switched off`, fix: 'Turn the subject back on' };
+  }
+  if (!it.inWindow) {
+    return { key: 'window', why: `dated ${fmtYbp(it.res.pos)}, outside the window`, fix: 'Widen the window' };
+  }
+  if (!it.zoomOK) {
+    return { key: 'zoom', why: 'below the zoom band at this width', fix: 'Zoom in' };
+  }
+  if (!it.inFocus) {
+    return { key: 'focus', why: `isolated away by ${SUBJECT_LABEL[S.focus] || S.focus}`, fix: 'Clear the isolation' };
+  }
+  return { key: 'other', why: 'not drawn', fix: null };
+}
+
+/* Clicking a row goes through chooseResult, which is the same path search uses:
+   it advances knowledge-time to the first dated year, re-enables the subject,
+   clears an isolation and widens the window only when the target is genuinely
+   outside it. Worth saying plainly, because the zoom gate is passed by neither
+   of those - it is passed by the `|| A.selection === id` override in
+   queryFacts, which chooseResult reaches by setting the selection. A reader who
+   assumes the window widening is what reveals a deep-time referent will build
+   the wrong thing: a 66 Ma referent with zoomMin 7 in a res.oldest * 1.7 window
+   sits at z about 1.9 and would stay hidden without the override. */
+function renderAbsent() {
+  const F = facts();
+  const shown = new Set(F.visible.map(i => i.id));
+  const rows = [];
+  for (const id in R.referents) {
+    if (shown.has(id)) continue;
+    rows.push({ id, label: R.referents[id].label, ...absenceReason(id, F) });
+  }
+  if (!rows.length) return '';
+
+  const RANK = { subject: 0, focus: 1, window: 2, zoom: 3, rolled: 4, unasserted: 5, other: 6 };
+  rows.sort((a, b) => (RANK[a.key] - RANK[b.key]) || a.label.localeCompare(b.label));
+
+  const groups = [];
+  for (const r of rows) {
+    const last = groups[groups.length - 1];
+    if (last && last.fix === r.fix) last.rows.push(r);
+    else groups.push({ fix: r.fix, rows: [r] });
+  }
+
+  return `
+    <details class="absent">
+      <summary>${rows.length} not on screen — and why</summary>
+      ${groups.map(g => `
+        ${g.fix ? `<p class="absent-fix">${esc(g.fix)}</p>` : ''}
+        <ul>${g.rows.map(r => `
+          <li><button class="edge-link" data-goto="${esc(r.id)}" style="padding:2px 0">
+            <span><span class="who">${esc(r.label)}</span>
+            <span class="mech">${esc(r.why)}</span></span>
+          </button></li>`).join('')}</ul>`).join('')}
+    </details>`;
 }
 
 function renderDetail() {
@@ -121,7 +242,7 @@ function renderDetail() {
         <span class="lbl">What is still to come · ${pending.length}</span>
         ${pending.slice(0, 8).map(c => `<div class="claim pending" style="--cl:var(--rule)">
           <p class="stmt">${esc(c.statement)}</p>
-          <p class="src">${esc(c.asserted_by)} — arrives in <span class="kt num">${c.knowledge_time}</span></p>
+          <p class="src">${sourceLink(c)} — arrives in <span class="kt num">${c.knowledge_time}</span></p>
         </div>`).join('')}
       </div>` : ''}`;
     return;
@@ -142,6 +263,7 @@ function renderDetail() {
             <span><span class="who">${esc(i.ref.label)}</span>
             <span class="mech">${fmtSpan(i.res.oldest - i.res.youngest)} of disagreement</span></span>
           </button></li>`).join('')}</ul>` : ''}
+        ${renderAbsent()}
       </div>`;
     return;
   }
@@ -192,7 +314,7 @@ function renderDetail() {
       <div class="big">${dateLine} ${prec ? `<span class="pm">${prec}</span>` : ''}</div>
       ${r.winner ? `
         <p class="prov">Resolved by <b>${esc(S.resolver === 'frontier' ? 'newest claim' : 'best supported')}</b>
-        to <b>${esc(r.winner.claim.asserted_by)}</b>, ${r.winner.status} since <b>${r.winner.since}</b>.
+        to <b>${sourceLink(r.winner.claim)}</b>, ${r.winner.status} since <b>${r.winner.since}</b>.
         ${r.dated.length > 1 ? `${r.dated.length - 1} competing claim${r.dated.length > 2 ? 's' : ''} below.` : ''}</p>`
         : `<p class="prov">Not resolved. Showing the full range of ${r.dated.length} surviving claims.</p>`}
       ${r.disputed ? `<p class="spread-note">Disputed — ${fmtSpan(r.oldest - r.youngest)} between the outermost claims.</p>` : ''}
@@ -221,7 +343,7 @@ function renderDetail() {
       ${pending.map(c => `<div class="claim pending" style="--cl:var(--rule)">
         <div class="row1"><span class="date num">${fmtYbp(c.earth_time_start)}</span></div>
         <p class="stmt">${esc(c.statement)}</p>
-        <p class="src">${esc(c.asserted_by)} — arrives in <span class="kt num">${c.knowledge_time}</span></p>
+        <p class="src">${sourceLink(c)} — arrives in <span class="kt num">${c.knowledge_time}</span></p>
       </div>`).join('')}
     </div>` : ''}
 

@@ -360,6 +360,53 @@ kcv.addEventListener('pointerup', e => {
   kDrag = false;
 });
 kcv.addEventListener('pointercancel', () => { kDrag = false; });
+/* ------------------------------------------------- the rail's hover readout
+   A bare pointermove, which neither rail had: both were pointerdown /
+   move-guarded-by-drag / up / cancel, so a grey pip under the cursor said
+   nothing. Hovering now names the landmark and what happened in that year,
+   which is what turns the rail from a numeric scale into a table of contents.
+   While dragging, the readout follows the value being set rather than the
+   pointer, so it never disagrees with the year in the header. */
+const elRailRead = document.getElementById('krail-read');
+let railHoverKt = null;
+
+function paintRailRead() {
+  if (!elRailRead) return;
+  const r = railReadout(railHoverKt == null ? S.kt : railHoverKt);
+  elRailRead.innerHTML =
+    `<span class="yr">${r.year}</span><span class="era">${esc(r.era)}</span>${esc(r.detail)}`;
+}
+
+kcv.addEventListener('pointermove', e => {
+  if (kDrag) { railHoverKt = null; paintRailRead(); return; }
+  if (e.pointerType === 'touch') return;
+  const r = kcv.getBoundingClientRect();
+  railHoverKt = yToKt(e.clientY - r.top);
+  paintRailRead();
+});
+kcv.addEventListener('pointerleave', () => { railHoverKt = null; paintRailRead(); });
+kcv.addEventListener('blur', () => { railHoverKt = null; paintRailRead(); });
+
+/* Step to the next year in which anything actually changes. 115 such years
+   across a 376-year rail, and the largest gap between two of them is 119
+   years - so a reader dragging blind spends most of the rail on nothing. */
+function stepChange(dir) {
+  stopReplay();
+  const y = nextChange(S.kt, dir);
+  if (y == null) return;
+  railHoverKt = null;
+  setKt(y);
+  paintRailRead();
+}
+document.getElementById('btn-prev').addEventListener('click', () => stepChange(-1));
+document.getElementById('btn-next').addEventListener('click', () => stepChange(1));
+
+function syncRailButtons() {
+  document.getElementById('btn-prev').disabled = nextChange(S.kt, -1) == null;
+  document.getElementById('btn-next').disabled = nextChange(S.kt, 1) == null;
+  if (railHoverKt == null) paintRailRead();
+}
+
 kcv.addEventListener('keydown', e => {
   const step = e.shiftKey ? 25 : 1;
   if (e.key === 'ArrowUp' || e.key === 'ArrowRight') setKt(S.kt + step);
@@ -611,6 +658,7 @@ function render(dt) {
     renderDetail(); renderSubjects();
     document.getElementById('asof-year').textContent = S.kt;
     document.getElementById('krail-year').textContent = S.kt;
+    syncRailButtons();
     document.getElementById('epistemic').textContent = epistemicCaption();
     const span = S.win.t1 - S.win.t0;
     document.getElementById('rd-window').textContent =

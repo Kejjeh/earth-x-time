@@ -262,22 +262,50 @@ let FACTS = null;
 function invalidate() { FACTS = null; }
 function facts() { return FACTS || (FACTS = queryFacts(S)); }
 
+/* ------------------------------------------------------- the named landmarks
+   These nine years were a ladder of `else if` thresholds inside
+   epistemicCaption, which meant the product knew exactly where its interesting
+   years were and the control that reaches them - the knowledge rail - did not.
+   At rest the rail was seven bare fifty-year numbers beside an unlabelled grey
+   shape, and a visitor dragging it was as likely to land on 1740, where nothing
+   moves, as on 1980, where the page changes.
+
+   One table now, read by both: the caption picks the last era at or below kt,
+   and 60_krail.js draws a tick per era and names it in the hover readout. Add a
+   landmark here and it appears in both places, or in neither. */
+const KT_ERAS = [
+  { from: KT_MIN, name: 'Before anyone is counting',
+    caption: 'The Earth has a history, but almost no one is counting it in years yet.' },
+  { from: 1700, name: 'Strata read as a sequence',
+    caption: 'Strata are understood to record a sequence. Their length is anyone’s guess.' },
+  { from: 1800, name: 'Deep time accepted',
+    caption: 'Deep time is accepted. Nothing can yet put a number on it.' },
+  { from: 1862, name: 'Kelvin’s ceiling',
+    caption: 'Physics says the Earth is under 100 million years old, and physics is winning.' },
+  { from: 1907, name: 'Radioactivity breaks the ceiling',
+    caption: 'Radioactivity has broken Kelvin’s ceiling; the age of the Earth is climbing.' },
+  { from: 1956, name: 'The Earth is 4.55 billion years old',
+    caption: 'The planet is 4.55 billion years old. Extinctions are still thought to be gradual.' },
+  { from: 1980, name: 'An asteroid is proposed',
+    caption: 'An asteroid has been proposed for the K–Pg extinction. Most palaeontologists are unconvinced.' },
+  { from: 1991, name: 'Chicxulub is found',
+    caption: 'Chicxulub has been found. The impact hypothesis has hardened into consensus.' },
+  { from: 2000, name: 'Clovis-first collapses',
+    caption: 'Clovis-first is collapsing, and the Deccan Traps are back in the K–Pg argument.' },
+  { from: 2015, name: 'Pre-Clovis accepted',
+    caption: 'Pre-Clovis sites are accepted, the Anthropocene has been proposed and rejected.' }
+];
+
+function eraAt(kt) {
+  let hit = KT_ERAS[0];
+  for (const e of KT_ERAS) if (kt >= e.from) hit = e;
+  return hit;
+}
+
 /* --------------------------------------------------- the rewriting caption */
 function epistemicCaption() {
   const F = facts();
-  const kt = S.kt;
-  const bits = [];
-
-  if (kt < 1700) bits.push('The Earth has a history, but almost no one is counting it in years yet.');
-  else if (kt < 1800) bits.push('Strata are understood to record a sequence. Their length is anyone’s guess.');
-  else if (kt < 1862) bits.push('Deep time is accepted. Nothing can yet put a number on it.');
-  else if (kt < 1907) bits.push('Physics says the Earth is under 100 million years old, and physics is winning.');
-  else if (kt < 1956) bits.push('Radioactivity has broken Kelvin’s ceiling; the age of the Earth is climbing.');
-  else if (kt < 1980) bits.push('The planet is 4.55 billion years old. Extinctions are still thought to be gradual.');
-  else if (kt < 1991) bits.push('An asteroid has been proposed for the K–Pg extinction. Most palaeontologists are unconvinced.');
-  else if (kt < 2000) bits.push('Chicxulub has been found. The impact hypothesis has hardened into consensus.');
-  else if (kt < 2015) bits.push('Clovis-first is collapsing, and the Deccan Traps are back in the K–Pg argument.');
-  else bits.push('Pre-Clovis sites are accepted, the Anthropocene has been proposed and rejected.');
+  const bits = [eraAt(S.kt).caption];
 
   const n = F.visible.length, d = F.disputedCount;
   bits.push(`${n} of ${Object.keys(R.referents).length} subjects visible, ${d} of them still disputed.`);
