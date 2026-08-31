@@ -1225,6 +1225,41 @@ def run_artifact(report):
         report.check("built artifact.html opens body-only, with no document wrapper",
                      not re.match(r"\s*<\s*(!doctype|html)\b", text, re.I), repr(text[:34]))
 
+    # ---------------------------------------------- what a scraper is handed
+    # The og:image is a file in this repo, and the tag is the only thing
+    # pointing at it - nothing in the page references preview.jpg, so a rename
+    # breaks the card silently and no gate upstream of here would notice. The
+    # file also has to be the format its extension claims: it shipped for a
+    # while as JPEG bytes under a .png name, which GitHub Pages then served as
+    # image/png and several validators reject outright.
+    std = os.path.join(ROOT, "earth-x-time.html")
+    if os.path.exists(std):
+        head = open(std, encoding="utf-8").read()[:9000]
+        want = ["og:title", "og:description", "og:image", "og:image:alt", "og:url",
+                "twitter:card", "twitter:image", 'name="description"', 'rel="icon"']
+        missing = [w for w in want if w not in head]
+        report.check("the standalone page carries its social card and favicon",
+                     not missing, f"missing {missing}" if missing else "all present")
+
+        m = re.search(r'property="og:image"\s+content="([^"]+)"', head)
+        if m:
+            name = m.group(1).rsplit("/", 1)[-1]
+            path = os.path.join(ROOT, name)
+            report.check("og:image names a file that is actually in the repo",
+                         os.path.exists(path), f"{name} -> {'found' if os.path.exists(path) else 'MISSING'}")
+            if os.path.exists(path):
+                magic = open(path, "rb").read(4)
+                ext = name.rsplit(".", 1)[-1].lower()
+                ok = (ext in ("jpg", "jpeg") and magic[:2] == b"\xff\xd8") or \
+                     (ext == "png" and magic == b"\x89PNG")
+                report.check("the preview image is the format its name claims",
+                             ok, f"{name} starts {magic.hex()}")
+
+        alt = re.search(r'property="og:image:alt"\s+content="([^"]+)"', head)
+        report.check("og:image:alt actually describes something",
+                     bool(alt) and len(alt.group(1)) > 40,
+                     (alt.group(1)[:60] + '...') if alt else "absent")
+
 
 # --------------------------------------------- the pre-commit hook, for real
 # README.md claims these cases are verified "against a staged file and a real
