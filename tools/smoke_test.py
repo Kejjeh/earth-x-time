@@ -847,6 +847,27 @@ def run_mobile(url, headed, report):
         report.check("the phone build boots", page.evaluate("window.__BOOT_OK") is True,
                      str(page.evaluate("window.__BOOT_ERR"))[:120])
 
+        # ---------------------------- the tour bar is a bar, not a sliver
+        # A flex row of six items in a box capped at 88% of 390px squeezed the
+        # step text to 60px wide and 300px tall, positioned against the
+        # viewport so it landed on the instrument panel below the stage.
+        page.tap("#btn-tour")
+        page.wait_for_timeout(1400)
+        bar = page.evaluate("""() => {
+          const b = document.getElementById('tourbar').getBoundingClientRect();
+          const t = document.getElementById('tour-step').getBoundingClientRect();
+          const n = document.getElementById('tour-next').getBoundingClientRect();
+          const under = document.elementFromPoint(n.left + n.width / 2, n.top + n.height / 2);
+          return { barH: b.height, barW: b.width, stepW: t.width, stepH: t.height,
+                   inside: b.top >= 0 && b.bottom <= innerHeight,
+                   nextHit: under === document.getElementById('tour-next') };
+        }""")
+        report.check("the phone tour bar is wide and short, and its Next is under a thumb",
+                     bar["stepW"] >= 0.6 * 390 and bar["barH"] <= 200 and bar["inside"] and bar["nextHit"],
+                     json.dumps(bar))
+        page.tap("#tour-exit")
+        page.wait_for_timeout(300)
+
         # ------------- every stage control can actually be reached by a finger
         # .stage-tr was shrink-to-fit anchored right inside an overflow:hidden
         # stage, so it grew off the LEFT edge: at 390px "Guided path" spanned
@@ -1511,6 +1532,79 @@ def run_features(url, headed, report):
                          anchors["none"] > 0, json.dumps(anchors))
             report.check("every outbound link is rel=noopener in a new tab",
                          anchors["safe"], json.dumps(anchors))
+
+            # ------------------------------- two facts about a source, kept apart
+            # "The DOI resolves to the cited work" is bibliographic. "The content
+            # was checked against the paper" is about the claim. The panel must
+            # say both, separately, and never let one stand in for the other:
+            # a claim can be checked with no DOI (Phillips 1841) and a DOI can
+            # resolve on a claim nobody has read against the paper.
+            facts_ = page.evaluate("""() => {
+              const cs = Object.values(R.claims);
+              const st = cs.map(sourceStatus);
+              return {
+                n: cs.length,
+                doi: cs.filter(c => c.doi).length,
+                resolves: st.filter(x => x.ref === 'resolves').length,
+                unresolved: st.filter(x => x.ref === 'unchecked').length,
+                checked: st.filter(x => x.content === 'checked').length,
+                checkedNoDoi: cs.filter(c => c.source_status === 'checked' && !c.doi).length,
+                resolvesUnchecked: st.filter(x => x.ref === 'resolves' && x.content === 'unchecked').length,
+                inlineMissed: cs.filter(c => !c.doi && /\bdoi[:\s]+10\./i.test(c.asserted_by)).length,
+                sidecar: Object.keys(SOURCE_CHECK).length
+              };
+            }""")
+            report.check("every recorded DOI has a Crossref record and resolves to the cited work",
+                         facts_["doi"] > 0 and facts_["resolves"] == facts_["doi"]
+                         and facts_["unresolved"] == 0, json.dumps(facts_))
+            report.check("a DOI written in the citation prose is also in the doi field",
+                         facts_["inlineMissed"] == 0, f"{facts_['inlineMissed']} missed")
+            report.check("checked content and a resolving DOI are independent facts",
+                         facts_["checkedNoDoi"] > 0 and facts_["resolvesUnchecked"] > 0,
+                         json.dumps(facts_))
+
+            # The panel says both, per claim, and the summary line adds up.
+            page.evaluate("""() => {
+              const id = Object.values(R.claims).find(c => c.source_status === 'checked' && c.doi).about;
+              setKt(KT_MAX); setSelection(R.referents[id] ? id : rootReferent(id));
+            }""")
+            page.wait_for_timeout(500)
+            marks = page.evaluate("""() => {
+              const blocks = [...document.querySelectorAll('#detail .claim')];
+              const rows = blocks.map(b => ({
+                doiMark: (b.querySelector('.doi-mark') || {}).textContent || '',
+                none: !!b.querySelector('a.doi.none'),
+                chk: (b.querySelector('.chk') || {}).textContent || ''
+              }));
+              const sum = document.querySelector('#detail .src-sum');
+              const nums = sum ? [...sum.querySelectorAll('b')].map(b => +b.textContent) : [];
+              const ref = R.byRef[S.selection] || [];
+              const want = [ref.filter(c => sourceStatus(c).ref === 'resolves').length,
+                            ref.filter(c => c.source_status === 'checked').length,
+                            ref.filter(c => c.source_status !== 'checked').length];
+              return { rows, nums, want, n: ref.length };
+            }""")
+            rows = marks["rows"]
+            report.check("every claim block carries a reference mark and a content mark",
+                         len(rows) > 0 and all((r["doiMark"] or r["none"]) and r["chk"] for r in rows),
+                         f"{len(rows)} blocks; first {json.dumps(rows[:2])}")
+            report.check("the reference mark never claims more than a resolution",
+                         all(r["doiMark"] in ("", "DOI resolves", "DOI unchecked") for r in rows)
+                         and all(r["chk"] in ("content checked", "attribution unchecked") for r in rows),
+                         json.dumps(sorted({r["doiMark"] for r in rows} | {r["chk"] for r in rows})))
+            report.check("the Sources line counts what the claims actually carry",
+                         marks["nums"] == marks["want"], f"line {marks['nums']} vs claims {marks['want']} of {marks['n']}")
+
+            page.evaluate("() => setSelection(null)")
+            page.wait_for_timeout(300)
+            corpus = page.evaluate("""() => {
+              const sum = document.querySelector('#detail .empty .src-sum');
+              return sum ? [...sum.querySelectorAll('b')].map(b => +b.textContent) : null;
+            }""")
+            report.check("the empty state states the corpus-wide source counts",
+                         corpus is not None and corpus[0] == facts_["resolves"]
+                         and corpus[1] == facts_["checked"]
+                         and corpus[2] == facts_["n"] - facts_["checked"], json.dumps(corpus))
 
             report.check("no page errors while exercising all three", errs == [], "; ".join(errs)[:150])
         finally:

@@ -8,6 +8,13 @@ const LAND_ENC   = '/*@LAND@*/';
 const PLATE_ENC  = '/*@PLATES@*/';
 const ICS        = /*@ICS@*/;
 const GRAPH      = /*@GRAPH@*/;
+/* Crossref's answer for every DOI in the graph, keyed by DOI: first author,
+   year, container, title, and whether those match the citation string. That
+   is a bibliographic fact - the reference exists and is the paper named - and
+   the panel words it as exactly that. Whether the paper supports the claim is
+   a different fact, carried by `source_status` on the claim, and nothing in
+   here upgrades one into the other. Written by tools/check_sources.py. */
+const SOURCE_CHECK = /*@SOURCES@*/;
 
 /* The epoch every earth_time_* value in graph.json was authored against. NOT the
    same quantity as KT_MAX below, however much they looked like the same number:

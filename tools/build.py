@@ -106,6 +106,16 @@ def main():
     earth = read(os.path.join(ASSETS, "earth.txt")).strip()
     ics = json.load(open(os.path.join(ASSETS, "ics.json"), encoding="utf-8"))
     graph = json.load(open(os.path.join(SRC, "graph.json"), encoding="utf-8"))
+    # What Crossref said about every DOI in the graph, keyed by DOI. The panel
+    # reads it to say "resolves to the cited work" and nothing stronger; the
+    # build refuses a graph whose DOIs it has no record of (validate_graph.py
+    # runs the same check) rather than letting the panel promise a resolution
+    # nobody looked for.
+    sources = json.load(open(os.path.join(SRC, "source_check.json"), encoding="utf-8"))
+    missing = sorted({c["doi"] for c in graph["claims"] if c.get("doi")} - set(sources.get("works", {})))
+    if missing:
+        sys.exit(f"FATAL: {len(missing)} DOI(s) in src/graph.json have no record in "
+                 f"src/source_check.json; run tools/check_sources.py --write. First: {missing[0]}")
 
     # The encoding alphabet excludes quote, backslash and angle brackets, so the
     # payloads drop into a JS string literal untouched. Assert it rather than hope.
@@ -120,6 +130,7 @@ def main():
     js = js.replace("/*@EARTH@*/", earth)
     js = js.replace("/*@ICS@*/", json.dumps(ics, separators=(",", ":")))
     js = js.replace("/*@GRAPH@*/", json.dumps(graph, separators=(",", ":"), ensure_ascii=False))
+    js = js.replace("/*@SOURCES@*/", json.dumps(sources.get("works", {}), separators=(",", ":"), ensure_ascii=False))
 
     # Nothing may reach the browser with a placeholder still in it.
     inner = head + "\n" + body + '\n<script>\n' + js + '\n</script>\n'
@@ -156,6 +167,10 @@ def main():
         f.write(open(out_std, encoding="utf-8").read())
 
     print(f"claims {len(graph['claims'])}  referents {len(graph['referents'])}  edges {len(graph['edges'])}")
+    n_doi = sum(1 for c in graph["claims"] if c.get("doi"))
+    n_ok = sum(1 for c in graph["claims"] if (sources["works"].get(c.get("doi")) or {}).get("match"))
+    n_chk = sum(1 for c in graph["claims"] if c.get("source_status") == "checked")
+    print(f"sources: {n_doi} DOIs, {n_ok} resolve to the cited work, {n_chk} claims content-checked")
     print(f"ics intervals {len(ics)}")
     print(f"land {len(land):,} chars   plates {len(plates):,} chars   earth {len(earth):,} chars")
     print(f"fonts {len(fonts):,} chars")
