@@ -65,16 +65,76 @@ function searchHref(c) {
     encodeURIComponent(String(c.asserted_by || '') + ' ' + String(c.statement || '').slice(0, 120));
 }
 
+/* What is known about a source, as two separate facts.
+
+   `ref` is bibliographic: does the DOI resolve, at Crossref, to a work whose
+   first author and year this claim's own citation names. SOURCE_CHECK.ref
+   holds that answer per claim, never per DOI: the same DOI beside a
+   different citation is a mismatch the build refuses. An author/year match
+   confirms the identifier is live and points at a work by that author from
+   that year. It does not prove it is the paper the citation means (one
+   author, one year, two papers), and it does not confirm the paper says what
+   the statement says, or that the date, the precision or the status timeline
+   are what the paper supports.
+
+   `content` is that second thing: source_status === 'checked' means the 2026
+   adversarial pass read the cited work against the claim - author, year,
+   venue and what the paper actually asserts. README's Known gaps says which
+   claims that was. A resolving DOI never promotes a claim to checked; the
+   two are drawn as different marks in different colours so a reader cannot
+   read one as the other. */
+function sourceStatus(c) {
+  const w = c.doi ? SOURCE_CHECK.works[c.doi] : null;
+  return {
+    ref: !c.doi ? 'none' : (w && SOURCE_CHECK.ref[c.id]) ? 'resolves' : 'unchecked',
+    content: c.source_status === 'checked' ? 'checked' : 'unchecked',
+    work: w
+  };
+}
+
 /* rel="noopener": these open in a new tab, and the opener reference would give
-   an unrelated origin a handle on this window. */
-function sourceLink(c) {
+   an unrelated origin a handle on this window.
+
+   `brief` drops the content mark - the resolved-position line already sits
+   under a status pill and a second chip there reads as noise; every claim
+   block below it carries both. */
+function sourceLink(c, brief) {
   const who = esc(c.asserted_by);
+  const st = sourceStatus(c);
+  let out;
   if (c.doi) {
-    return `<a class="doi" href="${esc(doiHref(c.doi))}" target="_blank" rel="noopener noreferrer"
-      title="Resolve ${esc(c.doi)} at doi.org">${who}<span class="doi-mark">DOI</span></a>`;
+    const title = st.ref === 'resolves'
+      ? `Resolves at doi.org to ${st.work.first_author} ${st.work.year}, ${st.work.container}: first author and year match this citation (Crossref, ${st.work.checked}). That is an author/year match, not proof it is the paper meant, and not a check of the claim.`
+      : `A DOI is recorded but has not been matched against this citation at Crossref. Resolve ${c.doi} at doi.org.`;
+    out = `<a class="doi ${st.ref === 'resolves' ? 'ok' : ''}" href="${esc(doiHref(c.doi))}" target="_blank" rel="noopener noreferrer"
+      title="${esc(title)}">${who}<span class="doi-mark">${st.ref === 'resolves' ? 'DOI resolves · author/year match' : 'DOI unchecked'}</span></a>`;
+  } else {
+    out = `${who} <a class="doi none" href="${esc(searchHref(c))}" target="_blank" rel="noopener noreferrer"
+      title="No DOI is recorded for this claim. Search for it.">no DOI recorded — search</a>`;
   }
-  return `${who} <a class="doi none" href="${esc(searchHref(c))}" target="_blank" rel="noopener noreferrer"
-    title="No DOI is recorded for this claim. Search for it.">no DOI recorded — search</a>`;
+  if (!brief) {
+    out += st.content === 'checked'
+      ? ` <span class="chk yes" title="Read against the cited work in the 2026 adversarial citation pass: author, year, venue and what the paper says. Dates and standing are still the claim's own.">content checked</span>`
+      : ` <span class="chk" title="Plausible attribution. Nobody on this project has confirmed that the cited work says this; the DOI, where there is one, only confirms the work exists.">attribution unchecked</span>`;
+  }
+  return out;
+}
+
+/* One sentence of the same two facts over a set of claims. Used for the
+   referent in the panel and for the whole corpus in the empty state. */
+function sourceSummary(claims, scope) {
+  let ref = 0, doi = 0, chk = 0;
+  for (const c of claims) {
+    const st = sourceStatus(c);
+    if (c.doi) doi++;
+    if (st.ref === 'resolves') ref++;
+    if (st.content === 'checked') chk++;
+  }
+  const n = claims.length, un = n - chk;
+  const s = k => k === 1 ? '' : 's';
+  return `<p class="src-sum">Of ${n} claim${s(n)} ${scope}, <b>${ref}</b> carr${ref === 1 ? 'ies' : 'y'} a DOI that resolves to a work by the cited first author and year`
+    + (doi > ref ? ` (${doi - ref} more carr${doi - ref === 1 ? 'ies' : 'y'} a DOI nobody has resolved)` : '')
+    + `, <b>${chk}</b> ${chk === 1 ? 'has' : 'have'} had ${chk === 1 ? 'its' : 'their'} content read against the paper, and <b>${un}</b> ${un === 1 ? 'is a' : 'are'} plausible attribution${s(un)} nobody has checked. An author/year match confirms the identifier, not the paper's identity and not the claim.</p>`;
 }
 
 function statusPill(st) {
@@ -263,6 +323,7 @@ function renderDetail() {
             <span><span class="who">${esc(i.ref.label)}</span>
             <span class="mech">${fmtSpan(i.res.oldest - i.res.youngest)} of disagreement</span></span>
           </button></li>`).join('')}</ul>` : ''}
+        ${sourceSummary(GRAPH.claims, 'in the graph')}
         ${renderAbsent()}
       </div>`;
     return;
@@ -314,7 +375,7 @@ function renderDetail() {
       <div class="big">${dateLine} ${prec ? `<span class="pm">${prec}</span>` : ''}</div>
       ${r.winner ? `
         <p class="prov">Resolved by <b>${esc(S.resolver === 'frontier' ? 'newest claim' : 'best supported')}</b>
-        to <b>${sourceLink(r.winner.claim)}</b>, ${r.winner.status} since <b>${r.winner.since}</b>.
+        to <b>${sourceLink(r.winner.claim, true)}</b>, ${r.winner.status} since <b>${r.winner.since}</b>.
         ${r.dated.length > 1 ? `${r.dated.length - 1} competing claim${r.dated.length > 2 ? 's' : ''} below.` : ''}</p>`
         : `<p class="prov">Not resolved. Showing the full range of ${r.dated.length} surviving claims.</p>`}
       ${r.disputed ? `<p class="spread-note">Disputed — ${fmtSpan(r.oldest - r.youngest)} between the outermost claims.</p>` : ''}
@@ -368,6 +429,7 @@ function renderDetail() {
       }</span></div>
       <div class="meta-row"><span class="k">Detail level</span><span class="v num">appears at zoom ${r.zoomMin.toFixed(0)}</span></div>
       <div class="meta-row"><span class="k">Claims</span><span class="v num">${r.live.length} live in ${kt}${pending.length ? ` · ${pending.length} still to come` : ''}</span></div>
+      ${sourceSummary(R.byRef[ref.id] || [], 'about this')}
     </div>`;
 }
 

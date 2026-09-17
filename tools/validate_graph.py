@@ -485,6 +485,28 @@ def main():
     if not died:
         warns.append("no causal edge dies between 1975 and 2025 — superseded links are invisible")
 
+    # ---- sources ----------------------------------------------------------
+    # What has been checked about each citation is data, and it has invariants:
+    # a DOI written in the citation prose must also be in the doi field (23 of
+    # the 37 content-checked claims were not, and the panel called them "no DOI
+    # recorded"); a byte-identical citation cannot carry a DOI on one claim and
+    # none on another; and every DOI must have a Crossref record in
+    # src/source_check.json whose first author and year THIS claim's citation
+    # names, because the panel says "DOI resolves; author/year match" only on
+    # the strength of that per-claim check (a DOI beside a different citation
+    # is an error, however well it resolves for the claim next door). The
+    # rules live in tools/check_sources.py; this runs its offline half and
+    # the offline regressions in tools/test_check_sources.py.
+    try:
+        import check_sources, test_check_sources
+        works = check_sources.load_sidecar().get("works", {})
+        for b in check_sources.consistency(claims, works):
+            errors.append(f"sources: {b}")
+        for name in test_check_sources.run():
+            errors.append(f"sources: regression failed: {name}")
+    except ImportError as e:
+        errors.append(f"sources: cannot import tools/check_sources.py ({e})")
+
     # ---- report -----------------------------------------------------------
     print(f"referents {len(refs)}   claims {len(claims)}   edges {len(kept)}")
     print(f"claims about other claims: {sum(1 for c in claims if c['about'] in cid)}")

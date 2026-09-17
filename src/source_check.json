@@ -1,0 +1,659 @@
+{
+ "works": {
+  "10.1007/BF01821169": {
+   "first_author": "Harland",
+   "year": 1964,
+   "container": "Geologische Rundschau",
+   "short_container": "Geol Rundsch",
+   "title": "Critical evidence for a great infra-Cambrian glaciation",
+   "checked": "2026-09-17"
+  },
+  "10.1016/0012-821X(86)90118-4": {
+   "first_author": "Courtillot",
+   "year": 1986,
+   "container": "Earth and Planetary Science Letters",
+   "short_container": "Earth and Planetary Science Letters",
+   "title": "Deccan flood basalts at the Cretaceous/Tertiary boundary?",
+   "checked": "2026-09-17"
+  },
+  "10.1016/0012-821X(91)90129-6": {
+   "first_author": "Claoué-Long",
+   "year": 1991,
+   "container": "Earth and Planetary Science Letters",
+   "short_container": "Earth and Planetary Science Letters",
+   "title": "The age of the Permian-Triassic boundary",
+   "checked": "2026-09-17"
+  },
+  "10.1016/S0012-821X(03)00347-9": {
+   "first_author": "Kamo",
+   "year": 2003,
+   "container": "Earth and Planetary Science Letters",
+   "short_container": "Earth and Planetary Science Letters",
+   "title": "Rapid eruption of Siberian flood-volcanic rocks and evidence for coincidence with the Permian–Triassic boundary and mass extinction at 251 Ma",
+   "checked": "2026-09-17"
+  },
+  "10.1016/S0016-7037(02)00950-X": {
+   "first_author": "Holland",
+   "year": 2002,
+   "container": "Geochimica et Cosmochimica Acta",
+   "short_container": "Geochimica et Cosmochimica Acta",
+   "title": "Volcanic gases, black smokers, and the great oxidation event",
+   "checked": "2026-09-17"
+  },
+  "10.1017/S0003598X00028088": {
+   "first_author": "Marinatos",
+   "year": 1939,
+   "container": "Antiquity",
+   "short_container": "Antiquity",
+   "title": "The Volcanic Destruction of Minoan Crete",
+   "checked": "2026-09-17"
+  },
+  "10.1038/35013005": {
+   "first_author": "Hyde",
+   "year": 2000,
+   "container": "Nature",
+   "short_container": "Nature",
+   "title": "Neoproterozoic ‘snowball Earth’ simulations with a coupled climate/ice-sheet model",
+   "checked": "2026-09-17"
+  },
+  "10.1038/nature02260": {
+   "first_author": "Bekker",
+   "year": 2004,
+   "container": "Nature",
+   "short_container": "Nature",
+   "title": "Dating the rise of atmospheric oxygen",
+   "checked": "2026-09-17"
+  },
+  "10.1038/nature22335": {
+   "first_author": "Richter",
+   "year": 2017,
+   "container": "Nature",
+   "short_container": "Nature",
+   "title": "The age of the hominin fossils from Jebel Irhoud, Morocco, and the origins of the Middle Stone Age",
+   "checked": "2026-09-17"
+  },
+  "10.1038/nature22336": {
+   "first_author": "Hublin",
+   "year": 2017,
+   "container": "Nature",
+   "short_container": "Nature",
+   "title": "New fossils from Jebel Irhoud, Morocco and the pan-African origin of Homo sapiens",
+   "checked": "2026-09-17"
+  },
+  "10.1038/s41586-021-03393-7": {
+   "first_author": "Poulton",
+   "year": 2021,
+   "container": "Nature",
+   "short_container": "Nature",
+   "title": "A 200-million-year delay in permanent atmospheric oxygenation",
+   "checked": "2026-09-17"
+  },
+  "10.1073/pnas.0400396101": {
+   "first_author": "Keller",
+   "year": 2004,
+   "container": "Proceedings of the National Academy of Sciences",
+   "short_container": "Proc. Natl. Acad. Sci. U.S.A.",
+   "title": "Chicxulub impact predates the K-T boundary mass extinction",
+   "checked": "2026-09-17"
+  },
+  "10.1073/pnas.0504878102": {
+   "first_author": "Kopp",
+   "year": 2005,
+   "container": "Proceedings of the National Academy of Sciences",
+   "short_container": "Proc. Natl. Acad. Sci. U.S.A.",
+   "title": "The Paleoproterozoic snowball Earth: A climate disaster triggered by the evolution of oxygenic photosynthesis",
+   "checked": "2026-09-17"
+  },
+  "10.1073/pnas.0700747104": {
+   "first_author": "Smith",
+   "year": 2007,
+   "container": "Proceedings of the National Academy of Sciences",
+   "short_container": "Proc. Natl. Acad. Sci. U.S.A.",
+   "title": "Earliest evidence of modern human life history in North African early Homo sapiens",
+   "checked": "2026-09-17"
+  },
+  "10.1073/pnas.1317692111": {
+   "first_author": "Burgess",
+   "year": 2014,
+   "container": "Proceedings of the National Academy of Sciences",
+   "short_container": "Proc. Natl. Acad. Sci. U.S.A.",
+   "title": "High-precision timeline for Earth’s most severe extinction",
+   "checked": "2026-09-17"
+  },
+  "10.1073/pnas.1608824114": {
+   "first_author": "Gumsley",
+   "year": 2017,
+   "container": "Proceedings of the National Academy of Sciences",
+   "short_container": "Proc. Natl. Acad. Sci. U.S.A.",
+   "title": "Timing and tempo of the Great Oxidation Event",
+   "checked": "2026-09-17"
+  },
+  "10.1093/pnasnexus/pgac048": {
+   "first_author": "Pearson",
+   "year": 2022,
+   "container": "PNAS Nexus",
+   "short_container": "",
+   "title": "Geochemical ice-core constraints on the timing and climatic impact of Aniakchak II (1628 BCE) and Thera (Minoan) volcanic eruptions",
+   "checked": "2026-09-17"
+  },
+  "10.1111/j.1475-4754.1991.tb00696.x": {
+   "first_author": "GRÜN",
+   "year": 1991,
+   "container": "Archaeometry",
+   "short_container": "Archaeometry",
+   "title": "ELECTRON SPIN RESONANCE DATING AND THE EVOLUTION OF MODERN HUMANS",
+   "checked": "2026-09-17"
+  },
+  "10.1126/sciadv.1500470": {
+   "first_author": "Burgess",
+   "year": 2015,
+   "container": "Science Advances",
+   "short_container": "Sci. Adv.",
+   "title": "High-precision geochronology confirms voluminous magmatism before, during, and after Earth’s most severe extinction",
+   "checked": "2026-09-17"
+  },
+  "10.1126/sciadv.1600134": {
+   "first_author": "Luo",
+   "year": 2016,
+   "container": "Science Advances",
+   "short_container": "Sci. Adv.",
+   "title": "Rapid oxygenation of Earth’s atmosphere 2.33 billion years ago",
+   "checked": "2026-09-17"
+  },
+  "10.1126/sciadv.aar8241": {
+   "first_author": "Pearson",
+   "year": 2018,
+   "container": "Science Advances",
+   "short_container": "Sci. Adv.",
+   "title": "Annual radiocarbon record indicates 16th century BCE date for the Thera eruption",
+   "checked": "2026-09-17"
+  },
+  "10.1126/science.1107765": {
+   "first_author": "Condon",
+   "year": 2005,
+   "container": "Science",
+   "short_container": "Science",
+   "title": "U-Pb Ages from the Neoproterozoic Doushantuo Formation, China",
+   "checked": "2026-09-17"
+  },
+  "10.1126/science.1125087": {
+   "first_author": "Friedrich",
+   "year": 2006,
+   "container": "Science",
+   "short_container": "Science",
+   "title": "Santorini Eruption Radiocarbon Dated to 1627-1600 B.C.",
+   "checked": "2026-09-17"
+  },
+  "10.1126/science.1125682": {
+   "first_author": "Manning",
+   "year": 2006,
+   "container": "Science",
+   "short_container": "Science",
+   "title": "Chronology for the Aegean Late Bronze Age 1700-1400 B.C.",
+   "checked": "2026-09-17"
+  },
+  "10.1126/science.1177265": {
+   "first_author": "Schulte",
+   "year": 2010,
+   "container": "Science",
+   "short_container": "Science",
+   "title": "The Chicxulub Asteroid Impact and Mass Extinction at the Cretaceous-Paleogene Boundary",
+   "checked": "2026-09-17"
+  },
+  "10.1126/science.1213454": {
+   "first_author": "Shen",
+   "year": 2011,
+   "container": "Science",
+   "short_container": "Science",
+   "title": "Calibrating the End-Permian Mass Extinction",
+   "checked": "2026-09-17"
+  },
+  "10.1126/science.1230492": {
+   "first_author": "Renne",
+   "year": 2013,
+   "container": "Science",
+   "short_container": "Science",
+   "title": "Time Scales of Critical Events Around the Cretaceous-Paleogene Boundary",
+   "checked": "2026-09-17"
+  },
+  "10.1126/science.208.4448.1095": {
+   "first_author": "Alvarez",
+   "year": 1980,
+   "container": "Science",
+   "short_container": "Science",
+   "title": "Extraterrestrial Cause for the Cretaceous-Tertiary Extinction",
+   "checked": "2026-09-17"
+  },
+  "10.1126/science.253.5016.176": {
+   "first_author": "Renne",
+   "year": 1991,
+   "container": "Science",
+   "short_container": "Science",
+   "title": "Rapid Eruption of the Siberian Traps Flood Basalts at the Permo-Triassic Boundary",
+   "checked": "2026-09-17"
+  },
+  "10.1126/science.257.5072.954": {
+   "first_author": "Swisher",
+   "year": 1992,
+   "container": "Science",
+   "short_container": "Science",
+   "title": "Coeval 40 Ar/ 39 Ar Ages of 65.0 Million Years Ago from Chicxulub Crater Melt Rock and Cretaceous-Tertiary Boundary Tektites",
+   "checked": "2026-09-17"
+  },
+  "10.1126/science.280.5366.1039": {
+   "first_author": "Bowring",
+   "year": 1998,
+   "container": "Science",
+   "short_container": "Science",
+   "title": "U/Pb Zircon Geochronology and Tempo of the End-Permian Mass Extinction",
+   "checked": "2026-09-17"
+  },
+  "10.1126/science.289.5480.756": {
+   "first_author": "Farquhar",
+   "year": 2000,
+   "container": "Science",
+   "short_container": "Science",
+   "title": "Atmospheric Influence of Earth's Earliest Sulfur Cycle",
+   "checked": "2026-09-17"
+  },
+  "10.1126/science.aac7549": {
+   "first_author": "Renne",
+   "year": 2015,
+   "container": "Science",
+   "short_container": "Science",
+   "title": "State shift in Deccan volcanism at the Cretaceous-Paleogene boundary, possibly induced by impact",
+   "checked": "2026-09-17"
+  },
+  "10.1126/science.aah6561": {
+   "first_author": "Morgan",
+   "year": 2016,
+   "container": "Science",
+   "short_container": "Science",
+   "title": "The formation of peak rings in large impact craters",
+   "checked": "2026-09-17"
+  },
+  "10.1126/science.aau2422": {
+   "first_author": "Schoene",
+   "year": 2019,
+   "container": "Science",
+   "short_container": "Science",
+   "title": "U-Pb constraints on pulsed eruption of the Deccan Traps across the end-Cretaceous mass extinction",
+   "checked": "2026-09-17"
+  },
+  "10.1126/science.aav1446": {
+   "first_author": "Sprain",
+   "year": 2019,
+   "container": "Science",
+   "short_container": "Science",
+   "title": "The eruptive tempo of Deccan volcanism in relation to the Cretaceous-Paleogene boundary",
+   "checked": "2026-09-17"
+  },
+  "10.1130/0091-7613(1991)019<0867:CCAPCT>2.3.CO;2": {
+   "first_author": "Hildebrand",
+   "year": 1991,
+   "container": "Geology",
+   "short_container": "Geol",
+   "title": "Chicxulub Crater: A possible Cretaceous/Tertiary boundary impact crater on the Yucatán Peninsula, Mexico",
+   "checked": "2026-09-17"
+  },
+  "10.1130/G36511.1": {
+   "first_author": "Rooney",
+   "year": 2015,
+   "container": "Geology",
+   "short_container": "",
+   "title": "A Cryogenian chronology: Two long-lasting synchronous Neoproterozoic glaciations",
+   "checked": "2026-09-17"
+  },
+  "10.2475/ajs.272.6.537": {
+   "first_author": "Cloud",
+   "year": 1972,
+   "container": "American Journal of Science",
+   "short_container": "American Journal of Science",
+   "title": "A working model of the primitive Earth",
+   "checked": "2026-09-17"
+  },
+  "10.1038/nature03676": {
+   "first_author": "Gomes",
+   "year": 2005,
+   "container": "Nature",
+   "short_container": "Nature",
+   "title": "Origin of the cataclysmic Late Heavy Bombardment period of the terrestrial planets",
+   "checked": "2026-09-17"
+  },
+  "10.1038/s41550-018-0564-3": {
+   "first_author": "Nesvorný",
+   "year": 2018,
+   "container": "Nature Astronomy",
+   "short_container": "Nat Astron",
+   "title": "Evidence for very early migration of the Solar System planets from the Patroclus–Menoetius binary Jupiter Trojan",
+   "checked": "2026-09-17"
+  },
+  "10.1038/nature06058": {
+   "first_author": "Kump",
+   "year": 2007,
+   "container": "Nature",
+   "short_container": "Nature",
+   "title": "Increased subaerial volcanism and the rise of atmospheric oxygen 2.5 billion years ago",
+   "checked": "2026-09-17"
+  },
+  "10.1130/0091-7613(1994)022<0295:BAIEFA>2.3.CO;2": {
+   "first_author": "Brenchley",
+   "year": 1994,
+   "container": "Geology",
+   "short_container": "Geology",
+   "title": "Bathymetric and isotopic evidence for a short-lived Late Ordovician glaciation in a greenhouse period",
+   "checked": "2026-09-17"
+  },
+  "10.1126/science.1200803": {
+   "first_author": "Finnegan",
+   "year": 2011,
+   "container": "Science",
+   "short_container": "Science",
+   "title": "The Magnitude and Duration of Late Ordovician–Early Silurian Glaciation",
+   "checked": "2026-09-17"
+  },
+  "10.1038/ngeo1390": {
+   "first_author": "Lenton",
+   "year": 2012,
+   "container": "Nature Geoscience",
+   "short_container": "Nature Geosci",
+   "title": "First plants cooled the Ordovician",
+   "checked": "2026-09-17"
+  },
+  "10.1146/annurev-earth-032320-095425": {
+   "first_author": "Mills",
+   "year": 2023,
+   "container": "Annual Review of Earth and Planetary Sciences",
+   "short_container": "",
+   "title": "Evolution of Atmospheric O2 Through the Phanerozoic, Revisited",
+   "checked": "2026-09-17"
+  },
+  "10.1038/375117a0": {
+   "first_author": "Graham",
+   "year": 1995,
+   "container": "Nature",
+   "short_container": "Nature",
+   "title": "Implications of the late Palaeozoic oxygen pulse for physiology and evolution",
+   "checked": "2026-09-17"
+  },
+  "10.1130/0016-7606(1963)74[93:SITCIO]2.0.CO;2": {
+   "first_author": "SLOSS",
+   "year": 1963,
+   "container": "Geological Society of America Bulletin",
+   "short_container": "Geol Soc America Bull",
+   "title": "Sequences in the Cratonic Interior of North America",
+   "checked": "2026-09-17"
+  },
+  "10.1016/j.gloplacha.2013.12.007": {
+   "first_author": "Haq",
+   "year": 2014,
+   "container": "Global and Planetary Change",
+   "short_container": "Global and Planetary Change",
+   "title": "Cretaceous eustasy revisited",
+   "checked": "2026-09-17"
+  },
+  "10.1126/science.1116412": {
+   "first_author": "Miller",
+   "year": 2005,
+   "container": "Science",
+   "short_container": "Science",
+   "title": "The Phanerozoic Record of Global Sea-Level Change",
+   "checked": "2026-09-17"
+  },
+  "10.1073/pnas.1601077113": {
+   "first_author": "Heintzman",
+   "year": 2016,
+   "container": "Proceedings of the National Academy of Sciences",
+   "short_container": "Proc. Natl. Acad. Sci. U.S.A.",
+   "title": "Bison phylogeography constrains dispersal and viability of the Ice Free Corridor in western Canada",
+   "checked": "2026-09-17"
+  },
+  "10.1073/pnas.2118558119": {
+   "first_author": "Clark",
+   "year": 2022,
+   "container": "Proceedings of the National Academy of Sciences",
+   "short_container": "Proc. Natl. Acad. Sci. U.S.A.",
+   "title": "The age of the opening of the Ice-Free Corridor and implications for the peopling of the Americas",
+   "checked": "2026-09-17"
+  },
+  "10.1126/science.145.3639.1408": {
+   "first_author": "Haynes",
+   "year": 1964,
+   "container": "Science",
+   "short_container": "Science",
+   "title": "Fluted Projectile Points: Their Age and Dispersion",
+   "checked": "2026-09-17"
+  },
+  "10.2307/279189": {
+   "first_author": "Fladmark",
+   "year": 1979,
+   "container": "American Antiquity",
+   "short_container": "Am. antiq.",
+   "title": "Routes: Alternate Migration Corridors for Early Man in North America",
+   "checked": "2026-09-17"
+  },
+  "10.1126/sciadv.aar5040": {
+   "first_author": "Lesnek",
+   "year": 2018,
+   "container": "Science Advances",
+   "short_container": "Sci. Adv.",
+   "title": "Deglaciation of the Pacific coastal corridor directly preceded the human colonization of the Americas",
+   "checked": "2026-09-17"
+  },
+  "10.1086/659144": {
+   "first_author": "Retallack",
+   "year": 2011,
+   "container": "The Journal of Geology",
+   "short_container": "The Journal of Geology",
+   "title": "Woodland Hypothesis for Devonian Tetrapod Evolution",
+   "checked": "2026-09-17"
+  },
+  "10.1126/science.aab3884": {
+   "first_author": "Raghavan",
+   "year": 2015,
+   "container": "Science",
+   "short_container": "Science",
+   "title": "Genomic evidence for the Pleistocene and recent population history of Native Americans",
+   "checked": "2026-09-17"
+  }
+ },
+ "lifted": [
+  {
+   "claim": "clm_americas_terminal_dispersal",
+   "doi": "10.1126/science.aab3884",
+   "rule": "inline"
+  },
+  {
+   "claim": "clm_chicxulub_causes_kpg",
+   "doi": "10.1126/science.208.4448.1095",
+   "rule": "identical"
+  },
+  {
+   "claim": "clm_chicxulub_date_65ma",
+   "doi": "10.1126/science.257.5072.954",
+   "rule": "identical"
+  },
+  {
+   "claim": "clm_chicxulub_extent_vs_reach",
+   "doi": "10.1126/science.1177265",
+   "rule": "identical"
+  },
+  {
+   "claim": "clm_chicxulub_iridium_gubbio",
+   "doi": "10.1126/science.208.4448.1095",
+   "rule": "identical"
+  },
+  {
+   "claim": "clm_coastal_route_fladmark_1979",
+   "doi": "10.2307/279189",
+   "rule": "inline"
+  },
+  {
+   "claim": "clm_coastal_route_lesnek_2018",
+   "doi": "10.1126/sciadv.aar5040",
+   "rule": "inline"
+  },
+  {
+   "claim": "clm_corridor_carried_first_americans",
+   "doi": "10.1126/science.145.3639.1408",
+   "rule": "inline"
+  },
+  {
+   "claim": "clm_corridor_clark_2022",
+   "doi": "10.1073/pnas.2118558119",
+   "rule": "inline"
+  },
+  {
+   "claim": "clm_corridor_heintzman_2016",
+   "doi": "10.1073/pnas.1601077113",
+   "rule": "inline"
+  },
+  {
+   "claim": "clm_devonian_woodland_hypothesis",
+   "doi": "10.1086/659144",
+   "rule": "inline"
+  },
+  {
+   "claim": "clm_goe_farquhar_mif",
+   "doi": "10.1126/science.289.5480.756",
+   "rule": "identical"
+  },
+  {
+   "claim": "clm_goe_triggered_snowball",
+   "doi": "10.1073/pnas.0504878102",
+   "rule": "identical"
+  },
+  {
+   "claim": "clm_gpm_early_2018",
+   "doi": "10.1038/s41550-018-0564-3",
+   "rule": "inline"
+  },
+  {
+   "claim": "clm_gpm_late_nice_2005",
+   "doi": "10.1038/nature03676",
+   "rule": "inline"
+  },
+  {
+   "claim": "clm_hirnantian_glaciation_brenchley_1994",
+   "doi": "10.1130/0091-7613(1994)022<0295:BAIEFA>2.3.CO;2",
+   "rule": "inline"
+  },
+  {
+   "claim": "clm_hirnantian_glaciation_finnegan_2011",
+   "doi": "10.1126/science.1200803",
+   "rule": "inline"
+  },
+  {
+   "claim": "clm_irhoud_within_sapiens_lineage",
+   "doi": "10.1038/nature22336",
+   "rule": "inline"
+  },
+  {
+   "claim": "clm_land_plants_cooled_hirnantian",
+   "doi": "10.1038/ngeo1390",
+   "rule": "inline"
+  },
+  {
+   "claim": "clm_lk_regression_amplitude",
+   "doi": "10.1126/science.1116412",
+   "rule": "inline"
+  },
+  {
+   "claim": "clm_lk_regression_eustatic_fall",
+   "doi": "10.1016/j.gloplacha.2013.12.007",
+   "rule": "inline"
+  },
+  {
+   "claim": "clm_lk_regression_sloss_1963",
+   "doi": "10.1130/0016-7606(1963)74[93:SITCIO]2.0.CO;2",
+   "rule": "inline"
+  },
+  {
+   "claim": "clm_minoan_collapse_manning_2006",
+   "doi": "10.1126/science.1125682",
+   "rule": "inline"
+  },
+  {
+   "claim": "clm_minoan_collapse_marinatos_cause",
+   "doi": "10.1017/S0003598X00028088",
+   "rule": "inline"
+  },
+  {
+   "claim": "clm_o2_enabled_insect_gigantism",
+   "doi": "10.1038/375117a0",
+   "rule": "inline"
+  },
+  {
+   "claim": "clm_o2_peak_mills_2023",
+   "doi": "10.1146/annurev-earth-032320-095425",
+   "rule": "inline"
+  },
+  {
+   "claim": "clm_oxyphoto_causes_goe",
+   "doi": "10.1073/pnas.0504878102",
+   "rule": "identical"
+  },
+  {
+   "claim": "clm_oxyphoto_late_origin",
+   "doi": "10.1073/pnas.0504878102",
+   "rule": "identical"
+  },
+  {
+   "claim": "clm_pt_dating_burgess2014",
+   "doi": "10.1073/pnas.1317692111",
+   "rule": "identical"
+  },
+  {
+   "claim": "clm_siberian_traps_dating",
+   "doi": "10.1126/sciadv.1500470",
+   "rule": "identical"
+  },
+  {
+   "claim": "clm_siberian_traps_existence",
+   "doi": "10.1126/science.253.5016.176",
+   "rule": "identical"
+  },
+  {
+   "claim": "clm_snowball_rooney_dating",
+   "doi": "10.1130/G36511.1",
+   "rule": "identical"
+  },
+  {
+   "claim": "clm_snowball_slushball",
+   "doi": "10.1038/35013005",
+   "rule": "identical"
+  },
+  {
+   "claim": "clm_svo_kump_barley_2007_cause",
+   "doi": "10.1038/nature06058",
+   "rule": "inline"
+  },
+  {
+   "claim": "clm_svo_kump_barley_2007_dating",
+   "doi": "10.1038/nature06058",
+   "rule": "inline"
+  },
+  {
+   "claim": "clm_thera_caused_collapse",
+   "doi": "10.1017/S0003598X00028088",
+   "rule": "title"
+  },
+  {
+   "claim": "clm_thera_radiocarbon_1600",
+   "doi": "10.1126/science.1125087",
+   "rule": "title"
+  },
+  {
+   "claim": "clm_thera_treering_1560",
+   "doi": "10.1126/sciadv.aar8241",
+   "rule": "title"
+  },
+  {
+   "claim": "clm_vvs_holland_2002_dating",
+   "doi": "10.1016/S0016-7037(02)00950-X",
+   "rule": "inline"
+  }
+ ],
+ "_comment": "Written by tools/check_sources.py. `works` is what Crossref said about each DOI in the graph: first author, year, journal, title. It carries no verdict; whether a claim's citation matches its DOI's record (first author and year) is recomputed per claim by the tool, the validator and the build. Even a match is a bibliographic fact only: it says the identifier is live and points at a work by the cited author from the cited year, not that the paper supports the claim, its date or its status timeline. Claim-level checking is the `source_status` field on the claim itself and this tool never writes it. `lifted` lists every claim whose `doi` field this tool filled, and by which rule (inline, identical, title).",
+ "checked": "2026-09-17"
+}
