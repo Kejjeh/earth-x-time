@@ -1551,12 +1551,28 @@ def run_features(url, headed, report):
                 checkedNoDoi: cs.filter(c => c.source_status === 'checked' && !c.doi).length,
                 resolvesUnchecked: st.filter(x => x.ref === 'resolves' && x.content === 'unchecked').length,
                 inlineMissed: cs.filter(c => !c.doi && /\bdoi[:\s]+10\./i.test(c.asserted_by)).length,
-                sidecar: Object.keys(SOURCE_CHECK).length
+                sidecar: Object.keys(SOURCE_CHECK.works).length,
+                perClaim: Object.keys(SOURCE_CHECK.ref).length
               };
             }""")
-            report.check("every recorded DOI has a Crossref record and resolves to the cited work",
+            report.check("every recorded DOI has a Crossref record whose author/year match its own claim's citation",
                          facts_["doi"] > 0 and facts_["resolves"] == facts_["doi"]
-                         and facts_["unresolved"] == 0, json.dumps(facts_))
+                         and facts_["unresolved"] == 0 and facts_["perClaim"] == facts_["doi"], json.dumps(facts_))
+            # The verdict is per claim: flipping one claim's entry changes that
+            # claim and no other claim sharing its DOI.
+            shared = page.evaluate("""() => {
+              const cs = Object.values(R.claims).filter(c => c.doi);
+              const byDoi = {}; cs.forEach(c => (byDoi[c.doi] = byDoi[c.doi] || []).push(c));
+              const pair = Object.values(byDoi).find(v => v.length >= 2);
+              if (!pair) return null;
+              const [a, b] = pair; const keep = SOURCE_CHECK.ref[a.id];
+              delete SOURCE_CHECK.ref[a.id];
+              const out = [sourceStatus(a).ref, sourceStatus(b).ref];
+              SOURCE_CHECK.ref[a.id] = keep;
+              return out;
+            }""")
+            report.check("the reference verdict is per claim, not inherited across a shared DOI",
+                         shared == ["unchecked", "resolves"], json.dumps(shared))
             report.check("a DOI written in the citation prose is also in the doi field",
                          facts_["inlineMissed"] == 0, f"{facts_['inlineMissed']} missed")
             report.check("checked content and a resolving DOI are independent facts",
@@ -1589,7 +1605,7 @@ def run_features(url, headed, report):
                          len(rows) > 0 and all((r["doiMark"] or r["none"]) and r["chk"] for r in rows),
                          f"{len(rows)} blocks; first {json.dumps(rows[:2])}")
             report.check("the reference mark never claims more than a resolution",
-                         all(r["doiMark"] in ("", "DOI resolves", "DOI unchecked") for r in rows)
+                         all(r["doiMark"] in ("", "DOI resolves · author/year match", "DOI unchecked") for r in rows)
                          and all(r["chk"] in ("content checked", "attribution unchecked") for r in rows),
                          json.dumps(sorted({r["doiMark"] for r in rows} | {r["chk"] for r in rows})))
             report.check("the Sources line counts what the claims actually carry",

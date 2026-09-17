@@ -68,10 +68,14 @@ function searchHref(c) {
 /* What is known about a source, as two separate facts.
 
    `ref` is bibliographic: does the DOI resolve, at Crossref, to a work whose
-   first author and year are the ones the citation names. SOURCE_CHECK holds
-   that answer per DOI. It confirms the reference exists and is the paper
-   named. It does not confirm the paper says what the statement says, or that
-   the date, the precision or the status timeline are what the paper supports.
+   first author and year this claim's own citation names. SOURCE_CHECK.ref
+   holds that answer per claim, never per DOI: the same DOI beside a
+   different citation is a mismatch the build refuses. An author/year match
+   confirms the identifier is live and points at a work by that author from
+   that year. It does not prove it is the paper the citation means (one
+   author, one year, two papers), and it does not confirm the paper says what
+   the statement says, or that the date, the precision or the status timeline
+   are what the paper supports.
 
    `content` is that second thing: source_status === 'checked' means the 2026
    adversarial pass read the cited work against the claim - author, year,
@@ -80,9 +84,9 @@ function searchHref(c) {
    two are drawn as different marks in different colours so a reader cannot
    read one as the other. */
 function sourceStatus(c) {
-  const w = c.doi ? SOURCE_CHECK[c.doi] : null;
+  const w = c.doi ? SOURCE_CHECK.works[c.doi] : null;
   return {
-    ref: !c.doi ? 'none' : (w && w.match) ? 'resolves' : 'unchecked',
+    ref: !c.doi ? 'none' : (w && SOURCE_CHECK.ref[c.id]) ? 'resolves' : 'unchecked',
     content: c.source_status === 'checked' ? 'checked' : 'unchecked',
     work: w
   };
@@ -100,10 +104,10 @@ function sourceLink(c, brief) {
   let out;
   if (c.doi) {
     const title = st.ref === 'resolves'
-      ? `Resolves at doi.org to ${st.work.first_author} ${st.work.year}, ${st.work.container} — checked against Crossref ${st.work.checked}. That confirms the reference, not the claim.`
-      : `A DOI is recorded but has not been matched against Crossref. Resolve ${c.doi} at doi.org.`;
+      ? `Resolves at doi.org to ${st.work.first_author} ${st.work.year}, ${st.work.container}: first author and year match this citation (Crossref, ${st.work.checked}). That is an author/year match, not proof it is the paper meant, and not a check of the claim.`
+      : `A DOI is recorded but has not been matched against this citation at Crossref. Resolve ${c.doi} at doi.org.`;
     out = `<a class="doi ${st.ref === 'resolves' ? 'ok' : ''}" href="${esc(doiHref(c.doi))}" target="_blank" rel="noopener noreferrer"
-      title="${esc(title)}">${who}<span class="doi-mark">${st.ref === 'resolves' ? 'DOI resolves' : 'DOI unchecked'}</span></a>`;
+      title="${esc(title)}">${who}<span class="doi-mark">${st.ref === 'resolves' ? 'DOI resolves · author/year match' : 'DOI unchecked'}</span></a>`;
   } else {
     out = `${who} <a class="doi none" href="${esc(searchHref(c))}" target="_blank" rel="noopener noreferrer"
       title="No DOI is recorded for this claim. Search for it.">no DOI recorded — search</a>`;
@@ -128,9 +132,9 @@ function sourceSummary(claims, scope) {
   }
   const n = claims.length, un = n - chk;
   const s = k => k === 1 ? '' : 's';
-  return `<p class="src-sum">Of ${n} claim${s(n)} ${scope}, <b>${ref}</b> carr${ref === 1 ? 'ies' : 'y'} a DOI that resolves to the cited work`
+  return `<p class="src-sum">Of ${n} claim${s(n)} ${scope}, <b>${ref}</b> carr${ref === 1 ? 'ies' : 'y'} a DOI that resolves to a work by the cited first author and year`
     + (doi > ref ? ` (${doi - ref} more carr${doi - ref === 1 ? 'ies' : 'y'} a DOI nobody has resolved)` : '')
-    + `, <b>${chk}</b> ${chk === 1 ? 'has' : 'have'} had ${chk === 1 ? 'its' : 'their'} content read against the paper, and <b>${un}</b> ${un === 1 ? 'is a' : 'are'} plausible attribution${s(un)} nobody has checked. A resolving DOI confirms the reference, not the claim.</p>`;
+    + `, <b>${chk}</b> ${chk === 1 ? 'has' : 'have'} had ${chk === 1 ? 'its' : 'their'} content read against the paper, and <b>${un}</b> ${un === 1 ? 'is a' : 'are'} plausible attribution${s(un)} nobody has checked. An author/year match confirms the identifier, not the paper's identity and not the claim.</p>`;
 }
 
 function statusPill(st) {

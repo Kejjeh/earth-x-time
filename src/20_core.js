@@ -8,12 +8,15 @@ const LAND_ENC   = '/*@LAND@*/';
 const PLATE_ENC  = '/*@PLATES@*/';
 const ICS        = /*@ICS@*/;
 const GRAPH      = /*@GRAPH@*/;
-/* Crossref's answer for every DOI in the graph, keyed by DOI: first author,
-   year, container, title, and whether those match the citation string. That
-   is a bibliographic fact - the reference exists and is the paper named - and
-   the panel words it as exactly that. Whether the paper supports the claim is
-   a different fact, carried by `source_status` on the claim, and nothing in
-   here upgrades one into the other. Written by tools/check_sources.py. */
+/* `works`: Crossref's answer for every DOI in the graph, keyed by DOI (first
+   author, year, container, title). `ref`: claim id -> true where that claim's
+   own citation names the record's first author and year, computed per claim
+   by the build. That is a bibliographic fact - the identifier is live and
+   points at a work by the cited author from the cited year - and the panel
+   words it as exactly that, not as proof it is the paper meant. Whether the
+   paper supports the claim is a different fact, carried by `source_status`
+   on the claim, and nothing in here upgrades one into the other. Written by
+   tools/check_sources.py and tools/build.py. */
 const SOURCE_CHECK = /*@SOURCES@*/;
 
 /* The epoch every earth_time_* value in graph.json was authored against. NOT the

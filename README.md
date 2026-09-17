@@ -28,7 +28,7 @@ the filter and the selection all live in `location.hash`, so
 | Double-click a **field of study** | Isolates it, and keeps the causal links that leave it. |
 | Hover the **knowledge rail**, or press **Next** | The rail names its landmarks and reports what happened in the year under the pointer — "1991 · Chicxulub is found · 7 claims first made, 2 superseded, 9 changed standing". 115 of the 376 years carry a change and the largest gap between two is 119, so Prev/Next step between them rather than leaving you to find them by dragging. |
 | With nothing selected, open **"n not on screen — and why"** | Names every referent that is not drawn and the one gate keeping it out — subject switched off, outside the window, below the zoom band, folded into a parent, or not yet claimed. Clicking one reveals it. |
-| Click a **source line** in any claim | Resolves the DOI where there is one — 95 of the 275 claims, every one matched at Crossref to the cited first author and year. Where there is not, it says *no DOI recorded* and offers a search. A second mark says whether anyone read the paper against the claim: 37 are *content checked*, the rest *attribution unchecked*, and a resolving DOI never turns into the other, because [Known gaps](#known-gaps) says which is which. |
+| Click a **source line** in any claim | Resolves the DOI where there is one — 82 of the 275 claims, each checked at Crossref against its own citation for first author and year, and the mark says exactly that: *DOI resolves · author/year match*, not "this is the paper meant". Where there is none, it says *no DOI recorded* and offers a search. A second mark says whether anyone read the paper against the claim: 37 are *content checked*, the rest *attribution unchecked*, and a resolving DOI never turns into the other, because [Known gaps](#known-gaps) says which is which. |
 
 ## Structure
 
@@ -178,7 +178,7 @@ about the 29% of Earth that is land rather than swallowing the globe, whether
 the announcement a screen reader hears is a sentence rather than the whole
 panel, whether a held selection speaks when its date moves and stays quiet when
 it does not, and whether the causal graph can be walked from a keyboard.
-138 checks, wired into `build.py`, exits non-zero.
+139 checks, wired into `build.py`, exits non-zero.
 
 It exists because this project lost an entire build to a boot failure that
 nothing detected: a legend swatch read the wrong palette key, `undefined` reached
@@ -264,9 +264,11 @@ for the same numbers.
 
 - **What has been checked about a citation is two different things, and the
   panel now says which.** A DOI that *resolves* means Crossref returns a work
-  whose first author and year match the citation string: the reference exists
-  and is the paper named. It does not mean the paper supports the statement,
-  the date, the precision or the status timeline. Content *checked* means the
+  whose first author and year this claim's own citation names: the identifier
+  is live and points at a work by that author from that year. It does not
+  prove it is the paper the citation means (an author can have two papers in
+  one journal in one year), and it does not mean the paper supports the
+  statement, the date, the precision or the status timeline. Content *checked* means the
   2026 adversarial pass read the cited work against the claim — author, year,
   venue and what the paper says — and 35 proposed items were dropped on the
   way, including one citation that does not exist and four papers that do not
@@ -276,20 +278,29 @@ for the same numbers.
   checked, and the panel labels every one of them *attribution unchecked*.
   The two marks never share a colour and one never stands in for the other.
 
-  The numbers, as of the last run of `tools/check_sources.py`: 95 of 275
-  claims carry a DOI and all 95 resolve to the cited work; 37 are content
-  checked, of which 23 also carry a resolving DOI; 166 have neither. Before
-  that run the graph had 43 DOIs, every one of them on an *unchecked* claim,
-  while 23 of the 37 checked claims carried their DOI inside the citation
-  prose where nothing read it — so the panel labelled the best-checked claims
-  in the graph *no DOI recorded*. The tool lifts a DOI into the field only by
-  a rule that names a bibliographic work: the prose already states it, another
-  claim with a byte-identical citation carries it, or a DOI-bearing claim
-  shares first author and year and Crossref's journal title appears in the
-  citation. Each lift is listed in `src/source_check.json` with its rule, and
-  `validate_graph.py` and the build both refuse a graph whose DOIs have no
-  record there. Nothing else moves: dates, precision and standing are the
-  claim's own, and a resolving DOI is never a reason to mark content checked.
+  The numbers, as of the last run of `tools/check_sources.py`: 82 of 275
+  claims carry a DOI and all 82 match their own citation on first author and
+  year; 37 are content checked, of which 23 also carry such a DOI; 179 have
+  neither. Before that run the graph had 43 DOIs, every one of them on an
+  *unchecked* claim, while 23 of the 37 checked claims carried their DOI
+  inside the citation prose where nothing read it — so the panel labelled the
+  best-checked claims in the graph *no DOI recorded*. The tool lifts a DOI
+  into the field only on evidence a reviewer can see in the citation string:
+  the prose already states the DOI (23 claims), another claim with a
+  byte-identical citation carries it (13), or the citation spells out the
+  work's full title and journal and exactly one DOI in the graph resolves to
+  that title, journal, first author and year (3). An earlier revision also
+  completed bare "Author year, Journal" citations from a DOI the graph
+  already held for that author, year and journal; that is not identity in
+  the literature (two papers, one author, one journal, one year) and those
+  16 lifts were reverted. Each lift is listed in `src/source_check.json`
+  with its rule; the match is recomputed per claim, never inherited from
+  another claim sharing the DOI; and `validate_graph.py` and the build both
+  refuse a graph with a DOI that has no record there or sits beside a
+  citation its record does not match. `tools/test_check_sources.py` holds
+  the offline regressions for those cases. Nothing else moves: dates,
+  precision and standing are the claim's own, and a resolving DOI is never a
+  reason to mark content checked.
 - **Deep-time coordinates are modern coordinates.** Every claim carries
   `coords_are_modern: true` and the detail panel says so. Chicxulub is drawn
   where the Yucatán is now. Plate reconstruction is not implemented; the flag
