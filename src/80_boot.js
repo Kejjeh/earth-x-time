@@ -668,8 +668,14 @@ function render(dt) {
     const ctx = cursorContext(S.cursor);
     document.getElementById('rd-cursor').innerHTML =
       `Cursor at <b>${fmtYbp(S.cursor)}</b>${ctx.length ? ' · ' + esc(ctx.join(' · ')) : ''}`;
+    /* aria-valuenow alone is a bare number in a unit nothing on screen uses:
+       the time axis announced "66043000" for a cursor the readout calls
+       "66 Ma", and the rail a year with nothing to say it is the year the
+       record is read from. aria-valuetext is what carries the words. */
     kcv.setAttribute('aria-valuenow', S.kt);
+    kcv.setAttribute('aria-valuetext', `as understood in ${S.kt}`);
     ccv.setAttribute('aria-valuenow', Math.round(S.cursor));
+    ccv.setAttribute('aria-valuetext', `cursor at ${fmtYbp(S.cursor)}`);
     if (!diffwrap.hidden) renderDiff();
     needPanel = false;
   }
