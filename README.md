@@ -178,7 +178,7 @@ about the 29% of Earth that is land rather than swallowing the globe, whether
 the announcement a screen reader hears is a sentence rather than the whole
 panel, whether a held selection speaks when its date moves and stays quiet when
 it does not, and whether the causal graph can be walked from a keyboard.
-139 checks, wired into `build.py`, exits non-zero.
+141 checks, wired into `build.py`, exits non-zero.
 
 It exists because this project lost an entire build to a boot failure that
 nothing detected: a legend swatch read the wrong palette key, `undefined` reached

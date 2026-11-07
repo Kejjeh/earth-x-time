@@ -221,6 +221,7 @@ button { background: none; border: none; cursor: pointer; padding: 0; }
 .subs { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 6px; }
 .sub {
   display: flex; align-items: center; gap: 7px; padding: 3px 5px 3px 3px;
+  min-height: 24px; box-sizing: border-box;   /* a finger target, WCAG 2.5.8; it was 23px */
   border-radius: var(--r); cursor: pointer; text-align: left; width: 100%;
   font-size: 11.5px; color: var(--chalk-dim); transition: background .12s, color .12s;
 }
@@ -4031,8 +4032,14 @@ function render(dt) {
     const ctx = cursorContext(S.cursor);
     document.getElementById('rd-cursor').innerHTML =
       `Cursor at <b>${fmtYbp(S.cursor)}</b>${ctx.length ? ' · ' + esc(ctx.join(' · ')) : ''}`;
+    /* aria-valuenow alone is a bare number in a unit nothing on screen uses:
+       the time axis announced "66043000" for a cursor the readout calls
+       "66 Ma", and the rail a year with nothing to say it is the year the
+       record is read from. aria-valuetext is what carries the words. */
     kcv.setAttribute('aria-valuenow', S.kt);
+    kcv.setAttribute('aria-valuetext', `as understood in ${S.kt}`);
     ccv.setAttribute('aria-valuenow', Math.round(S.cursor));
+    ccv.setAttribute('aria-valuetext', `cursor at ${fmtYbp(S.cursor)}`);
     if (!diffwrap.hidden) renderDiff();
     needPanel = false;
   }

@@ -602,6 +602,22 @@ def run(url, headed, report):
                      and rail["nowLabel"] == str(PY_MAX) and rail["diffMax"] == PY_MAX,
                      f"python {PY_MIN}..{PY_MAX}   page {json.dumps(rail)}")
 
+        # aria-valuenow alone is a bare number in a unit nothing on screen uses.
+        # The time axis announced "66043000" for a cursor the readout calls
+        # "66.0 Ma", and the rail a year with nothing to say it was a year of
+        # reading rather than of happening. aria-valuetext carries the words.
+        vt = page.evaluate("""() => {
+          setKt(1991); S.cursor = 66043000; invalidate(); renderNow();
+          return { rail: document.getElementById('krailcv').getAttribute('aria-valuetext'),
+                   chron: document.getElementById('chroncv').getAttribute('aria-valuetext') };
+        }""")
+        report.check("both sliders announce their value in words",
+                     bool(vt["rail"]) and bool(vt["chron"])
+                     and any(c.isalpha() for c in vt["rail"] or "")
+                     and any(c.isalpha() for c in vt["chron"] or "")
+                     and "1991" in (vt["rail"] or "") and "66 Ma" in (vt["chron"] or ""),
+                     f"rail {vt['rail']!r}, axis {vt['chron']!r}")
+
         # ------- 16. the chips count the marks they account for, and only those
         # subjectCounts was tallied before the window, the zoom band and the
         # roll-up had been applied, so it moved with knowledge-time and nothing
@@ -891,6 +907,22 @@ def run_mobile(url, headed, report):
         }""")
         report.check("every stage control is reachable on a phone",
                      unreachable == [], json.dumps(unreachable)[:200])
+
+        # WCAG 2.5.8: a target is at least 24x24 CSS px unless it is inline in
+        # a sentence or has that much clear space around it. The field chips
+        # were 23px tall and stacked with no gap between them. Measured, not
+        # assumed: the boxes the phone actually lays out.
+        small = page.evaluate("""() => {
+          const bad = [];
+          for (const el of document.querySelectorAll('#subjects .sub, #resolver button, .presets button, .edge-link')) {
+            const r = el.getBoundingClientRect();
+            if (r.width > 0 && r.height > 0 && (r.width < 24 || r.height < 24))
+              bad.push((el.id || el.className || el.tagName) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height));
+          }
+          return bad;
+        }""")
+        report.check("every chip and panel button is a 24px target under a finger",
+                     small == [], (", ".join(small[:6]) + (" ..." if len(small) > 6 else "")) or "all at least 24x24")
 
         # ----------------------------------- a tap on a marker shows something
         # The detail panel is grid row 3 under a 46vh stage - measured at
