@@ -17,6 +17,7 @@ python tools/check_no_local_paths.py --all # exit 0 = no home-directory path in 
 python -m http.server 8731                 # the "earth-x-time" config in .claude/launch.json; earth-x-time.html also opens off disk
 ```
 
+- CI (`.github/workflows/tests.yml`) runs the five offline commands above, with Playwright, on every push to `main` and every PR, and fails on any diff after the build.
 - `build.py` writes `earth-x-time.html`, `artifact.html` (body-only) and `index.html` (Pages). It does **not** run `validate_graph.py`; run that first when the graph changed. `--no-smoke` skips the browser gate (never as the final check).
 - The smoke test needs `playwright` with Chromium (installed here). Without it `build.py` prints "skipping smoke test" and still exits 0, so check that the `141/141` line appears.
 - Set `PYTHONUTF8=1` on Windows.
