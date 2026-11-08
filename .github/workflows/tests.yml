@@ -54,6 +54,9 @@ jobs:
       # is missing, so also require that the smoke test actually ran.
       - name: Build and smoke test
         run: |
+          # Without an explicit shell, run steps use bash -e with no pipefail,
+          # so a failing build.py would be hidden behind tee.
+          set -o pipefail
           python tools/build.py | tee "$RUNNER_TEMP/build.log"
           if grep -q "skipping smoke test" "$RUNNER_TEMP/build.log"; then
             echo "::error::the smoke test did not run"; exit 1
