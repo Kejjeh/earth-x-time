@@ -1,0 +1,64 @@
+# Run the offline gates on every push to main and every pull request.
+#
+# No network, no secrets. Skipped in CI, on purpose:
+#   - tools/check_sources.py without --offline (calls Crossref and can rewrite
+#     src/source_check.json); only the --offline mode runs here.
+#   - tools/ingest.py and tools/fetch_*.py (network; they rewrite committed data).
+
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build, smoke test and offline gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # No requirements file: the tools are standard library, except the smoke
+      # test, which needs Playwright with Chromium (installed below).
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Playwright and Chromium (for the smoke test)
+        run: |
+          python -m pip install playwright==1.59.0
+          python -m playwright install --with-deps chromium
+
+      - name: Validate the graph
+        run: python tools/validate_graph.py
+
+      - name: Check sources (offline)
+        run: python tools/check_sources.py --offline
+
+      - name: Test check_sources.py
+        run: python tools/test_check_sources.py
+
+      - name: No home-directory paths in tracked files
+        run: python tools/check_no_local_paths.py --all
+
+      # build.py exits 0 and only prints "skipping smoke test" when Playwright
+      # is missing, so also require that the smoke test actually ran.
+      - name: Build and smoke test
+        run: |
+          python tools/build.py | tee "$RUNNER_TEMP/build.log"
+          if grep -q "skipping smoke test" "$RUNNER_TEMP/build.log"; then
+            echo "::error::the smoke test did not run"; exit 1
+          fi
+          grep -q "checks passed" "$RUNNER_TEMP/build.log"
+
+      - name: Built files match the commit
+        run: git diff --exit-code --stat
